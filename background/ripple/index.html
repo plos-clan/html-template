@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title></title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+    }
+
+    #background {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -1;
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="background"></canvas>
+  <canvas id="textCanvas" style="display:none;"></canvas>
+  <script>
+    function getTextBitmap(text, size = 16) {
+      const canvas = document.getElementById('textCanvas');
+      const ctx = canvas.getContext('2d');
+      ctx.font = `${size}px sans-serif`;
+      const textMetrics = ctx.measureText(text);
+      const width = Math.ceil(textMetrics.width);
+      const height = Math.ceil(textMetrics.actualBoundingBoxAscent + textMetrics.actualBoundingBoxDescent);
+      canvas.width = width;
+      canvas.height = height;
+      ctx.font = `${size}px sans-serif`;
+      ctx.fillStyle = 'black';
+      ctx.fillText(text, 0, textMetrics.actualBoundingBoxAscent);
+      const data = ctx.getImageData(0, 0, width, height).data;
+      const output = new Float32Array(width * height);
+      for (let i = 0; i < data.length / 4; i++) {
+        output[i] = data[i * 4 + 3] / 255;
+      }
+      return { output, width, height };
+    }
+  </script>
+  <script>
+    const canvas = document.getElementById('background');
+    const color_bg = { r: 27, g: 95, b: 220 };
+    const color_fg = { r: 95, g: 251, b: 241 };
+    const set_canvas = (function (canvas) {
+      let width, height;
+      let depth, speed;
+      let img, ctx, aid;
+      function points_of_line(x0, y0, x1, y1) {
+        const points = [];
+        const dx = Math.abs(x1 - x0);
+        const dy = Math.abs(y1 - y0);
+        const sx = (x0 < x1) ? 1 : -1;
+        const sy = (y0 < y1) ? 1 : -1;
+        let err = dx - dy;
+        while (true) {
+          points.push({ x: x0, y: y0 });
+          if (x0 === x1 && y0 === y1) break;
+          let e2 = 2 * err;
+          if (e2 > -dy) err -= dy, x0 += sx;
+          if (e2 < dx) err += dx, y0 += sy;
+        }
+        points.pop();
+        return points;
+      }
+      function calc() {
+        for (let y = 1; y < height - 1; y++) {
+          for (let x = 1; x < width - 1; x++) {
+            const i = x + y * width;
+            const dd1 = depth[i - 1] + depth[i + 1] + depth[i - width] + depth[i + width];
+            const dd2 = depth[i - 1 - width] + depth[i + 1 - width] + depth[i - 1 + width] + depth[i + 1 + width];
+            speed[i] += dd1 + dd2 * .7072 - depth[i] * 6.8289;
+          }
+        }
+        for (let i = 0; i < width; i++) {
+          depth[i] *= .984375;
+        }
+        for (let i = 0; i < width; i++) {
+          depth[(height - 1) * width + i] *= .984375;
+        }
+        for (let i = 0; i < height; i++) {
+          depth[i * width] *= .984375;
+        }
+        for (let i = 0; i < height; i++) {
+          depth[i * width + width - 1] *= .984375;
+        }
+        for (let i = 1; i < width * height - 1; i++) {
+          depth[i] = depth[i] * .984375 + speed[i] * .125;
+        }
+      }
+      function draw() {
+        for (let i = 1; i < width * height - 1; i++) {
+          const k = depth[i] < -1 ? 0 : depth[i] > 1 ? 1 : depth[i] / 2 + .5;
+          img.data[i * 4] = color_fg.r * k + color_bg.r * (1 - k);
+          img.data[i * 4 + 1] = color_fg.g * k + color_bg.g * (1 - k);
+          img.data[i * 4 + 2] = color_fg.b * k + color_bg.b * (1 - k);
+          img.data[i * 4 + 3] = 255;
+        }
+        ctx.putImageData(img, 0, 0);
+      }
+      function disturb(x, y) {
+        const i = x + y * width;
+        depth[i] += 1;
+        if (x - 1 > 0) depth[i - 1] += 1;
+        if (x + 1 < width) depth[i + 1] += 1;
+        if (y - 1 > 0) depth[i - width] += 1;
+        if (y + 1 < height) depth[i + width] += 1;
+      }
+      function fill_text(text, size = 16, k = 1) {
+        const { output, width: text_width, height: text_height } = getTextBitmap(text, size);
+        const dx = Math.floor((width - text_width) / 2), dy = Math.floor((height - text_height) / 2);
+        for (let y = 0; y < text_height; y++) {
+          for (let x = 0; x < text_width; x++) {
+            const i = (x + dx) + (y + dy) * width;
+            depth[i] += output[x + y * text_width] * k;
+          }
+        }
+      }
+      function animate() {
+        if (Math.random() < .5) disturb(Math.floor(Math.random() * width), Math.floor(Math.random() * height));
+        calc();
+        draw();
+        aid = requestAnimationFrame(animate);
+      }
+      function callback(e) {
+        const { offsetX, offsetY } = e;
+        const { movementX, movementY } = e;
+        const oldX = offsetX - movementX;
+        const oldY = offsetY - movementY;
+        const points = points_of_line(oldX, oldY, offsetX, offsetY);
+        points.forEach(p => depth[p.x + p.y * width] += 1);
+      }
+      return function (canvas) {
+        ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        width = canvas.width;
+        height = canvas.height;
+        depth = new Float32Array(width * height);
+        speed = new Float32Array(width * height);
+        img = ctx.createImageData(width, height);
+        aid = requestAnimationFrame(animate);
+        canvas.addEventListener('mousemove', callback);
+        return {
+          fill_text, cancel: function () {
+            canvas.removeEventListener('mousemove', callback);
+            cancelAnimationFrame(aid);
+          }
+        };
+      };
+    })();
+    let { fill_text, cancel } = set_canvas(canvas);
+    window.addEventListener('resize', () => {
+      cancel();
+      let { _fill_text, _cancel } = set_canvas(canvas);
+      fill_text = _fill_text, cancel = _cancel;
+    });
+    setTimeout(() => fill_text('Welcome to plos-clan!', 128), 1000);
+    setTimeout(() => fill_text('欢迎来到 plos-clan！', 128), 5000); 
+  </script>
+</body>
+
+</html>
