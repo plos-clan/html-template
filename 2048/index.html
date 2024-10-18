@@ -75,6 +75,7 @@ Check your Browserslist config to be sure that your targets are set up correctly
 
     body {
       font-family: monospace !important;
+      user-select: none;
     }
   </style>
 </head>
@@ -93,7 +94,8 @@ Check your Browserslist config to be sure that your targets are set up correctly
       </div>
       <div class="text-xl font-bold">Score: <span x-text="`0x${score.toString(16).toUpperCase()}`"></span></div>
     </div>
-    <div class="grid gap-2" :style="`grid-template-columns: repeat(${boardSize}, minmax(0, 1fr));`">
+    <div class="grid gap-2" :style="`grid-template-columns: repeat(${boardSize}, minmax(0, 1fr));`"
+      @touchstart.prevent="handleTouchStart($event)" @touchend.prevent="handleTouchEnd($event)">
       <template x-for="(row, rowIndex) in board" :key="rowIndex">
         <template x-for="(cell, cellIndex) in row" :key="cellIndex">
           <div class="w-16 h-16 flex items-center justify-center text-xl font-bold rounded-lg"
@@ -119,6 +121,10 @@ Check your Browserslist config to be sure that your targets are set up correctly
         newBoardSize: 4,
         score: 0,
         NUM_MAX: 4294967296,
+        touchStartX: 0,
+        touchStartY: 0,
+        touchEndX: 0,
+        touchEndY: 0,
         autoMoveInterval: null,
 
         initGame() {
@@ -148,9 +154,48 @@ Check your Browserslist config to be sure that your targets are set up correctly
           }
         },
 
+        handleTouchStart(event) {
+          this.touchStartX = event.changedTouches[0].screenX;
+          this.touchStartY = event.changedTouches[0].screenY;
+        },
+
+        handleTouchEnd(event) {
+          this.touchEndX = event.changedTouches[0].screenX;
+          this.touchEndY = event.changedTouches[0].screenY;
+          this.handleTouchDirection();
+        },
+
+        handleTouchDirection() {
+          const deltaX = this.touchEndX - this.touchStartX;
+          const deltaY = this.touchEndY - this.touchStartY;
+
+          let direction = null;
+          if (Math.abs(deltaX) > Math.abs(deltaY)) {
+            if (deltaX > 10) {
+              direction = 'right';
+            } else if (deltaX < -10) {
+              direction = 'left';
+            }
+          } else {
+            if (deltaY > 10) {
+              direction = 'down';
+            } else if (deltaY < -10) {
+              direction = 'up';
+            }
+          }
+
+          if (direction === null) return;
+
+          if (this.move(direction)) {
+            this.addNewTile();
+            if (this.isGameOver()) {
+              alert('Game Over!');
+            }
+          }
+        },
+
         handleKeyPress(event) {
           const key = event.key.toLowerCase();
-          let moved = false;
 
           if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd'].includes(key)) {
             event.preventDefault();
@@ -173,9 +218,8 @@ Check your Browserslist config to be sure that your targets are set up correctly
                 direction = 'right';
                 break;
             }
-            moved = this.move(direction);
 
-            if (moved) {
+            if (this.move(direction)) {
               this.addNewTile();
               if (this.isGameOver()) {
                 alert('Game Over!');
