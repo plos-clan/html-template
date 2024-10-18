@@ -262,13 +262,13 @@ Check your Browserslist config to be sure that your targets are set up correctly
         },
 
         getCellStyle(value) {
-          if (value > 0x10000) return 'font-size: 20px;';
+          if (value >= 0x10000) return 'font-size: 20px;';
           const fontSize = 60 / (Math.floor(Math.log2(value) / 4) + 3);
           return `font-size: ${fontSize}px;`;
         },
 
         getCellText(value) {
-          if (value > 0x10000) return `2<sup>${Math.floor(Math.log2(value))}</sup>`;
+          if (value >= 0x10000) return `2<sup>${Math.floor(Math.log2(value))}</sup>`;
           return `0x${value.toString(16).toUpperCase()}`;
         },
 
