@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title></title>
+  <script src="jszip.js"></script>
+</head>
+
+<body style="margin: 0; padding: 0;">
+  <div id="body" style="position: relative; width: 640px; height: 480px; overflow: hidden; display: none;">
+    <div id="Background" style="position: absolute; width: 100%; height: 100%;"></div>
+    <div id="Fail" style="position: absolute; width: 100%; height: 100%;"></div>
+    <div id="Pass" style="position: absolute; width: 100%; height: 100%;"></div>
+    <div id="Foreground" style="position: absolute; width: 100%; height: 100%;"></div>
+  </div>
+  <input type="file" id="fileInput" style="margin: 10px;" />
+  <script>
+    window.onload = function () {
+      var div = document.getElementById('body');
+      var scale = Math.min(window.innerWidth / 640, window.innerHeight / 480);
+      div.style.width = 640 * scale + 'px';
+      div.style.height = 480 * scale + 'px';
+      document.body.style.marginLeft = (window.innerWidth - 640 * scale) / 2 + 'px';
+      document.body.style.marginTop = (window.innerHeight - 480 * scale) / 2 + 'px';
+    };
+
+    const files = {};
+    let storyboard = [];
+    let storyboard_by_starttime = [];
+    let storyboard_by_endtime = [];
+    let playStartTime = 0;
+    const body = document.getElementById('body');
+    const queue = { start: [], stop: [], now: [] };
+
+    function load_audio_file(content) {
+      const audio = new Audio(URL.createObjectURL(new Blob([content])));
+      audio.loop = false;
+      audio.play();
+      playStartTime = Date.now();
+    }
+
+    function sbSetPosition(element, origin, x, y, w, h) {
+      if (origin === null && !element.sb_origin) return;
+      if (origin === null) {
+        origin = element.sb_origin;
+      } else {
+        element.sb_origin = origin;
+      }
+      x = x === null ? element.sb_x : x / 640 * 100;
+      y = y === null ? element.sb_y : y / 480 * 100;
+      w = w === null ? element.sb_w : w / 640 * 100;
+      h = h === null ? element.sb_h : h / 480 * 100;
+      element.sb_x = x;
+      element.sb_y = y;
+      element.sb_w = w;
+      element.sb_h = h;
+      switch (origin) {
+        case 'Centre': x -= w / 2; y -= h / 2; break;
+        case 'CentreLeft': y -= h / 2; break;
+        case 'TopRight': x -= w; break;
+        case 'BottomCentre': x -= w / 2; y -= h; break;
+        case 'TopCentre': x -= w / 2; break;
+        case 'CentreRight': x -= w; y -= h / 2; break;
+        case 'BottomLeft': y -= h; break;
+        case 'BottomRight': x -= w; y -= h; break;
+      }
+      element.style.left = x + '%';
+      element.style.top = y + '%';
+      element.style.width = w + '%';
+      element.style.height = h + '%';
+    }
+
+    function sbSetScale(element, x, y) {
+      sbSetPosition(element, null, null, null, element.naturalWidth * x, element.naturalHeight * y);
+    }
+
+    function sbInterpolation(v1, v2, starttime, endtime, time, easing) {
+      if (time >= endtime || endtime === starttime) return v2;
+      if (time <= starttime) return v1;
+      const t = (time - starttime) / (endtime - starttime);
+      const lerp = (a, b, t) => a + (b - a) * t;
+      return lerp(v1, v2, t);
+    }
+
+    function sbPosInterpolation(x1, y1, x2, y2, starttime, endtime, time, easing) {
+      if (time >= endtime || endtime === starttime) return { x: x2, y: y2 };
+      if (time <= starttime) return { x: x1, y: y1 };
+      const t = (time - starttime) / (endtime - starttime);
+      const lerp = (a, b, t) => a + (b - a) * t;
+      return {
+        x: lerp(x1, x2, t),
+        y: lerp(y1, y2, t)
+      };
+    }
+
+    function updateStoryboard() {
+      if (playStartTime === 0) {
+        requestAnimationFrame(updateStoryboard);
+        return;
+      }
+      const time = Date.now() - playStartTime;
+      const now_start = [];
+      const now_stop = [];
+      while (queue.start.length && queue.start[0].starttime <= time) {
+        now_start.push(queue.start.shift());
+      }
+      while (queue.stop.length && queue.stop[0].endtime <= time) {
+        now_stop.push(queue.stop.shift());
+      }
+      for (let event of now_start) {
+        const container = document.getElementById(event.layer);
+        if (container) {
+          const img = document.createElement('img');
+          img.id = `storyboard-element-${event.id}`;
+          img.src = event.type === 'Sprite' ? URL.createObjectURL(new Blob([files[event.filepath]])) : '';
+          img.style.position = 'absolute';
+          img.style.zIndex = event.id;
+          img.display = 'none';
+          img.sb_hide = true;
+          sbSetPosition(img, event.origin, event.x, event.y, 640, 480);
+          img.onload = function () {
+            sbSetPosition(img, event.origin, event.x, event.y, img.naturalWidth, img.naturalHeight);
+            img.onload = null;
+            img.sb_loaded = true;
+          };
+          container.appendChild(img);
+        }
+      }
+      for (let event of now_stop) {
+        const element = document.getElementById(`storyboard-element-${event.id}`);
+        if (element) element.remove();
+      }
+      queue.now.push(...now_start);
+      queue.now = queue.now.filter(event => !now_stop.includes(event));
+      for (let event of queue.now) {
+        const img = document.getElementById(`storyboard-element-${event.id}`);
+        if (!img) continue;
+        if (event.type === 'Animation') {
+          const [basename, extname] = event.filepath.split('.');
+          let n = Math.floor((time - event.starttime) / event.frameDelay);
+          if (n >= event.frameCount) n = event.looptype === 'LoopForever' ? n % event.frameCount : event.frameCount;
+          if (n !== img.nframe) {
+            img.nframe = n;
+            img.src = URL.createObjectURL(new Blob([files[`${basename}${n}.${extname}`]]));
+          }
+        }
+        for (let cmd of event.commands) {
+          if (cmd.starttime > time) continue;
+          if (img.sb_hide) {
+            img.display = 'block';
+            img.sb_hide = false;
+          }
+          switch (cmd.event) {
+            case 'M': {
+              const x1 = cmd.params[0];
+              const y1 = cmd.params[1];
+              const x2 = cmd.params[2];
+              const y2 = cmd.params[3];
+              const { x, y } = sbPosInterpolation(x1, y1, x2, y2, cmd.starttime, cmd.endtime, time, cmd.easing);
+              sbSetPosition(img, event.origin, x, y, null, null);
+              break;
+            }
+            case 'MX': {
+              const x1 = cmd.params[0];
+              const x2 = cmd.params[1];
+              const x = sbInterpolation(x1, x2, cmd.starttime, cmd.endtime, time, cmd.easing);
+              sbSetPosition(img, event.origin, x, null, null, null);
+              break;
+            }
+            case 'MY': {
+              const y1 = cmd.params[0];
+              const y2 = cmd.params[1];
+              const y = sbInterpolation(y1, y2, cmd.starttime, cmd.endtime, time, cmd.easing);
+              sbSetPosition(img, event.origin, null, y, null, null);
+              break;
+            }
+            case 'F': {
+              const o1 = cmd.params[0];
+              const o2 = cmd.params[1];
+              const o = sbInterpolation(o1, o2, cmd.starttime, cmd.endtime, time, cmd.easing);
+              img.style.opacity = o;
+              break;
+            }
+            case 'S': {
+              const v1 = cmd.params[0];
+              const v2 = cmd.params[1];
+              const v = sbInterpolation(v1, v2, cmd.starttime, cmd.endtime, time, cmd.easing);
+              sbSetScale(img, v, v);
+              break;
+            }
+            case 'V': {
+              const x1 = cmd.params[0];
+              const y1 = cmd.params[1];
+              const x2 = cmd.params[2];
+              const y2 = cmd.params[3];
+              const { x, y } = sbPosInterpolation(x1, y1, x2, y2, cmd.starttime, cmd.endtime, time, cmd.easing);
+              sbSetScale(img, x, y);
+              break;
+            }
+            case 'R': {
+              const r1 = cmd.params[0];
+              const r2 = cmd.params[1];
+              const r = sbInterpolation(r1, r2, cmd.starttime, cmd.endtime, time, cmd.easing);
+              img.style.transform = `rotate(${r}rad)`;
+              break;
+            }
+            case 'C': {
+              const r1 = cmd.params[0];
+              const g1 = cmd.params[1];
+              const b1 = cmd.params[2];
+              const r2 = cmd.params[3];
+              const g2 = cmd.params[4];
+              const b2 = cmd.params[5];
+              const r = sbInterpolation(r1, r2, cmd.starttime, cmd.endtime, time, cmd.easing);
+              const g = sbInterpolation(g1, g2, cmd.starttime, cmd.endtime, time, cmd.easing);
+              const b = sbInterpolation(b1, b2, cmd.starttime, cmd.endtime, time, cmd.easing);
+              img.style.filter = `rgb(${r}, ${g}, ${b})`;
+              break;
+            }
+          }
+        }
+      }
+      requestAnimationFrame(updateStoryboard);
+    }
+
+    function load_osb_file(content) {
+      const osb = new TextDecoder().decode(content);
+      const lines = osb.split('\n').map((line) => line.trim()).filter((line) => line && !line.startsWith('//') && !line.startsWith('[')).map((line) => line.split(',').map((part) => {
+        part = part.trim();
+        if (part.startsWith('"') && part.endsWith('"')) {
+          return part.slice(1, -1);
+        } else if (!isNaN(parseFloat(part))) {
+          return parseFloat(part);
+        } else {
+          return part;
+        }
+      }));
+      let next_id = 0;
+      const objects = ((lines) => {
+        const objects = [];
+        let current = null;
+        lines.forEach((line) => {
+          if (line[0] === 'Sprite' || line[0] === 'Animation') {
+            if (current) objects.push(current);
+            current = [line];
+          } else if (current) {
+            current.push(line);
+          }
+        });
+        if (current) objects.push(current);
+        return objects;
+      })(lines).map((object) => {
+        const head = object[0];
+        const data = object.slice(1);
+        var event = head[0] == 'Sprite' ? {
+          type: head[0],
+          layer: head[1],
+          origin: head[2], // 图像的原点
+          filepath: head[3].replace('\\', '/'),
+          x: head[4],
+          y: head[5],
+        } : {
+          type: head[0],
+          layer: head[1],
+          origin: head[2], // 图像的原点
+          filepath: head[3].replace('\\', '/'),
+          x: head[4],
+          y: head[5],
+          frameCount: head[6],
+          frameDelay: head[7],
+          looptype: head[8],
+        };
+        event.id = next_id++;
+        event.commands = [];
+        data.forEach((line) => ((list, line) => {
+          const paranums = { 'F': 2, 'M': 4, 'MX': 2, 'MY': 2, 'S': 2, 'V': 4, 'R': 2, 'C': 6, 'P': 1 };
+          const paranum = paranums[line[0]];
+          if (!paranum) return;
+          const data = {
+            event: line[0],
+            easing: line[1],
+            starttime: line[2],
+            endtime: line[3] !== '' ? line[3] : line[2],
+          };
+          line = line.slice(4);
+          if (line.length < paranum) {
+            for (let i = 0; line.length < paranum; i++) {
+              line.push(line[i]);
+            }
+            const d = { ...data };
+            d.params = line;
+            list.push(d);
+          } else {
+            for (let i = 0; i < line.length / paranum; i++) {
+              const d = { ...data };
+              d.params = line.slice(i * paranum, (i + 1) * paranum);
+              list.push(d);
+            }
+          }
+        })(event.commands, line));
+        event.starttime = Math.min(...event.commands.map(cmd => cmd.starttime));
+        event.endtime = Math.max(...event.commands.map(cmd => cmd.endtime));
+        return event;
+      });
+      storyboard = objects;
+      storyboard_by_starttime = objects.slice().sort((a, b) => a.starttime - b.starttime);
+      storyboard_by_endtime = objects.slice().sort((a, b) => a.endtime - b.endtime);
+      queue.start = storyboard_by_starttime.slice();
+      queue.stop = storyboard_by_endtime.slice();
+      queue.now = [];
+      updateStoryboard();
+    }
+
+    function load_file(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      document.getElementById('fileInput').style.display = 'none';
+      document.getElementById('body').style.display = 'block';
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        const zip = new JSZip();
+        zip.loadAsync(e.target.result).then(function (zip) {
+          const promises = [];
+          zip.forEach(function (relativePath, zipEntry) {
+            const name = zipEntry.name;
+            promises.push(zipEntry.async('arraybuffer').then((content) => {
+              files[name] = content;
+            }));
+          });
+          Promise.all(promises).then(() => {
+            for (let name in files) {
+              if (name.endsWith('.osb')) {
+                load_osb_file(files[name]);
+              }
+              if (name.indexOf('/') === -1 && name.indexOf('\\') === -1 && (name.endsWith('.mp3') || name.endsWith('.m4a') || name.endsWith('.ogg') || name.endsWith('.oga'))) {
+                load_audio_file(files[name]);
+              }
+            }
+          });
+        });
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    document.getElementById('fileInput').addEventListener('change', load_file);
+  </script>
+</body>
+
+</html>
