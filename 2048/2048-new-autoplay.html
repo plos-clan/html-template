@@ -16,19 +16,6 @@
       font-family: monospace !important;
       user-select: none;
     }
-
-    input.edit-cell {
-      outline: none;
-    }
-
-    input.edit-cell:focus {
-      color: darkcyan;
-    }
-
-    input.edit-cell::selection {
-      background: #ffcc00;
-      color: darkcyan;
-    }
   </style>
 </head>
 
@@ -51,37 +38,16 @@
       <template x-for="(row, rowIndex) in board" :key="rowIndex">
         <template x-for="(cell, cellIndex) in row" :key="cellIndex">
           <div class="w-16 h-16 flex items-center justify-center text-xl font-bold rounded-lg"
-            :class="getCellClass(cell)" :style="getCellStyle(cell) + 'position: relative;'">
-            <template x-if="!isEditMode">
-              <span x-html="cell ? getCellText(cell) : ''"></span>
-            </template>
-            <template x-if="isEditMode">
-              <span>2<sup><input type="text" class="bg-transparent text-center edit-cell" maxlength="2" size="2"
-                    style="width: 2ch;" x-model="editBoard[rowIndex][cellIndex]"
-                    @input="editModeInput(rowIndex, cellIndex, $event.target.value)" @focus="$event.target.select()"
-                    :ref="`editCell-${rowIndex}-${cellIndex}`" /></sup></span>
-            </template>
-            <template x-if="isEditMode && cell == 0">
-              <div class="absolute inset-0 z-10" style="background: transparent;"
-                @mousedown.prevent="board[rowIndex][cellIndex] = 2; editBoard[rowIndex][cellIndex] = 1">
-              </div>
-            </template>
-          </div>
+            :class="getCellClass(cell)" :style="getCellStyle(cell)" x-html="cell ? getCellText(cell) : ''"></div>
         </template>
       </template>
     </div>
     <div class="mt-4 text-center">
-      <button @click="startAutoMove()" class="text-white font-bold py-2 px-4 rounded"
-        :class="isEditMode ? 'bg-gray-500' : 'bg-blue-500 hover:bg-blue-600'" :disabled="isEditMode">
+      <button @click="startAutoMove()" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">
         Auto
       </button>
-      <button @click="resetGame()" class="text-white font-bold py-2 px-4 rounded"
-        :class="isEditMode ? 'bg-gray-500' : 'bg-blue-500 hover:bg-blue-600'" :disabled="isEditMode">
+      <button @click="resetGame()" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">
         New Game
-      </button>
-      <button @click="toggleEditMode()" class="text-white font-bold py-2 px-4 rounded"
-        :class="autoMoveInterval ? 'bg-gray-500' : 'bg-blue-500 hover:bg-blue-600'" :disabled="autoMoveInterval">
-        Edit Mode
       </button>
     </div>
   </div>
@@ -94,8 +60,6 @@
         newBoardSize: 4,
         score: 0,
         NUM_MAX: 4294967296,
-        isEditMode: false,
-        editBoard: [],
         touchStartX: 0,
         touchStartY: 0,
         touchEndX: 0,
@@ -112,25 +76,6 @@
           this.score = 0;
           this.addNewTile();
           this.addNewTile();
-        },
-
-        toggleEditMode() {
-          this.isEditMode = !this.isEditMode;
-          if (this.isEditMode) {
-            this.editBoard = this.board.map(row => row.map(cell => cell ? Math.floor(Math.log2(cell)) : 0));
-          } else {
-            if (this.isGameOver()) {
-              alert('Game Over!');
-            }
-          }
-        },
-
-        editModeInput(row, col, value) {
-          value = value.replace(/[^0-9]/g, '');
-          value = value ? parseInt(value) : 0;
-          value = Math.min(value, 32);
-          this.editBoard[row][col] = value;
-          this.board = this.editBoard.map(row => row.map(cell => cell ? Math.pow(2, cell) : 0));
         },
 
         addNewTile() {
@@ -160,7 +105,6 @@
         },
 
         handleTouchDirection() {
-          if (this.isEditMode) return;
           const deltaX = this.touchEndX - this.touchStartX;
           const deltaY = this.touchEndY - this.touchStartY;
 
@@ -190,7 +134,6 @@
         },
 
         handleKeyPress(event) {
-          if (this.isEditMode) return;
           const key = event.key.toLowerCase();
 
           if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd'].includes(key)) {
@@ -302,8 +245,6 @@
         },
 
         getCellStyle(value) {
-          if (value === 0) return `font-size: 0px;`;
-          if (this.isEditMode) return 'font-size: 20px;';
           if (value >= 0x10000) return 'font-size: 20px;';
           const fontSize = 60 / (Math.floor(Math.log2(value) / 4) + 3);
           return `font-size: ${fontSize}px;`;
@@ -399,28 +340,92 @@
           for (let j = 0; j < size; j++) {
             if (board[i][j] === 0) {
               score++;
-            } else if (i + 1 < size && board[i][j] === board[i + 1][j]) {
-              score++;
-            } else if (j + 1 < size && board[i][j] === board[i][j + 1]) {
-              score++;
             }
           }
         }
         return score;
+
+        // let score = 0;
+        // let maxNum = 0;
+        // for (let i = 0; i < size; i++) {
+        //   for (let j = 0; j < size; j++) {
+        //     maxNum = Math.max(board[i][j], maxNum);
+        //     if (board[i][j] === 0) {
+        //       score += 1;
+        //       if (i + 1 < size && board[i + 1][j] === 0) {
+        //         score += 3;
+        //       }
+        //       if (j + 1 < size && board[i][j + 1] === 0) {
+        //         score += 3;
+        //       }
+        //     } else {
+        //       if (board[i][j] == 2) {
+        //         if ((i - 1 < 0 || (board[i - 1][j] !== 0 && board[i - 1][j] !== 2))
+        //           && (i + 1 >= size || (board[i + 1][j] !== 0 && board[i + 1][j] !== 2))
+        //           && (j - 1 < 0 || (board[i][j - 1] !== 0 && board[i][j - 1] !== 2))
+        //           && (j + 1 >= size || (board[i][j + 1] !== 0 && board[i][j + 1] !== 2))) {
+        //           score -= 3;
+        //         }
+        //       } else if (i + 1 < size && board[i][j] === board[i + 1][j]
+        //         || j + 1 < size && board[i][j] === board[i][j + 1]
+        //       ) {
+        //         score += 5;
+        //       }
+        //     }
+        //   }
+        // }
+        // if (maxNum > 2) {
+        //   for (let i = 0; i < size; i++) {
+        //     if (board[i][0] === maxNum || board[i][size - 1] === maxNum) {
+        //       score += 6;
+        //     }
+        //   }
+        //   for (let j = 0; j < size; j++) {
+        //     if (board[0][j] === maxNum || board[size - 1][j] === maxNum) {
+        //       score += 6;
+        //     }
+        //   }
+        // }
+        // return score;
       }
 
-      let bestMove = null;
-      let maxScore = -1;
-
-      for (const direction of directions) {
-        const [moved, newBoard] = moveBoard(board, direction);
-        if (!moved) continue;
-        const score = calcScores(newBoard);
-        if (score > maxScore) {
-          maxScore = score;
-          bestMove = direction;
+      function getBestMove(board, depth) {
+        if (depth === 0) {
+          return [null, calcScores(board)];
         }
+
+        let bestMove = null;
+        let maxScore = -1048576;
+
+        for (const direction of directions) {
+          const [moved, newBoard] = moveBoard(board, direction);
+          if (!moved) continue;
+          const emptyCells = [];
+          for (let i = 0; i < size; i++) {
+            for (let j = 0; j < size; j++) {
+              if (newBoard[i][j] === 0) {
+                emptyCells.push({ i, j });
+              }
+            }
+          }
+          let avgScore = 0;
+          for (const { i, j } of emptyCells) {
+            let board = newBoard.map(row => row.slice());
+            board[i][j] = 2;
+            const [_, score] = getBestMove(board, depth - 1);
+            avgScore += score;
+          }
+          avgScore /= emptyCells.length;
+          if (avgScore > maxScore) {
+            maxScore = avgScore;
+            bestMove = direction;
+          }
+        }
+
+        return [bestMove, maxScore];
       }
+
+      const [bestMove] = getBestMove(board, 3);
 
       return bestMove || null;
     }
