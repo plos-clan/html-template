@@ -139,11 +139,15 @@
           this.addNewTile();
         },
 
+        updateEditModeData() {
+          this.scoreHex = `0x${this.score.toString(16).toUpperCase()}`;
+          this.editBoard = this.board.map(row => row.map(cell => cell ? Math.floor(Math.log2(cell)) : 0));
+        },
+
         toggleEditMode() {
           this.isEditMode = !this.isEditMode;
           if (this.isEditMode) {
-            this.scoreHex = `0x${this.score.toString(16).toUpperCase()}`;
-            this.editBoard = this.board.map(row => row.map(cell => cell ? Math.floor(Math.log2(cell)) : 0));
+            this.updateEditModeData();
           } else {
             if (this.isGameOver()) {
               alert('Game Over!');
@@ -182,6 +186,9 @@
             const { board, score } = this.undoStack.pop();
             this.board = board;
             this.score = score;
+            if (this.isEditMode) {
+              this.updateEditModeData();
+            }
           }
         },
 
@@ -191,6 +198,9 @@
             const { board, score } = this.redoStack.pop();
             this.board = board;
             this.score = score;
+            if (this.isEditMode) {
+              this.updateEditModeData();
+            }
           }
         },
 
