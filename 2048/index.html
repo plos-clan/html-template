@@ -101,11 +101,18 @@ Check your Browserslist config to be sure that your targets are set up correctly
       class="w-full sm:w-64">
     <div class="mb-4 flex flex-col sm:flex-row justify-between items-center">
       <div class="mb-2 sm:mb-0">
-        <label for="boardSize" class="mr-2">Board Size:
+        <label for="boardSize" class="mr-2">Size:
           <span x-text="`0x${parseInt(newBoardSize).toString(16).toUpperCase()}`"></span>
         </label>
       </div>
-      <div class="text-xl font-bold">Score: <span x-text="`0x${score.toString(16).toUpperCase()}`"></span></div>
+      <template x-if="!isEditMode">
+        <div class="text-xl font-bold">Score: <span x-text="`0x${score.toString(16).toUpperCase()}`"></span></div>
+      </template>
+      <template x-if="isEditMode">
+        <div class="text-xl font-bold">Score: <input type="text" class="bg-transparent text-center edit-cell"
+            maxlength="11" size="11" style="width: 11ch;" x-model="scoreHex"
+            @input="editModeScoreInput($event.target.value)" @focus="$event.target.select()" /></div>
+      </template>
     </div>
     <div class="grid gap-2" :style="`grid-template-columns: repeat(${boardSize}, minmax(0, 1fr));`"
       @touchstart.prevent="handleTouchStart($event)" @touchend.prevent="handleTouchEnd($event)">
@@ -132,17 +139,27 @@ Check your Browserslist config to be sure that your targets are set up correctly
       </template>
     </div>
     <div class="mt-4 text-center">
-      <button @click="startAutoMove()" class="text-white font-bold py-2 px-4 rounded"
+      <button @click="undo()" class="text-white font-bold py-1.5 px-3 rounded"
+        :class="autoMoveInterval || undoStack.length == 0 ? 'bg-gray-500' : 'bg-blue-500 hover:bg-blue-600'"
+        :disabled="autoMoveInterval || undoStack.length == 0">
+        Undo
+      </button>
+      <button @click="startAutoMove()" class="text-white font-bold py-1.5 px-3 rounded"
         :class="isEditMode ? 'bg-gray-500' : 'bg-blue-500 hover:bg-blue-600'" :disabled="isEditMode">
         Auto
       </button>
-      <button @click="resetGame()" class="text-white font-bold py-2 px-4 rounded"
+      <button @click="resetGame()" class="text-white font-bold py-1.5 px-3 rounded"
         :class="isEditMode ? 'bg-gray-500' : 'bg-blue-500 hover:bg-blue-600'" :disabled="isEditMode">
-        New Game
+        New
       </button>
-      <button @click="toggleEditMode()" class="text-white font-bold py-2 px-4 rounded"
+      <button @click="toggleEditMode()" class="text-white font-bold py-1.5 px-3 rounded"
         :class="autoMoveInterval ? 'bg-gray-500' : 'bg-blue-500 hover:bg-blue-600'" :disabled="autoMoveInterval">
-        Edit Mode
+        Edit
+      </button>
+      <button @click="redo()" class="text-white font-bold py-1.5 px-3 rounded"
+        :class="autoMoveInterval || redoStack.length == 0 ? 'bg-gray-500' : 'bg-blue-500 hover:bg-blue-600'"
+        :disabled="autoMoveInterval || redoStack.length == 0">
+        Redo
       </button>
     </div>
   </div>
@@ -150,10 +167,13 @@ Check your Browserslist config to be sure that your targets are set up correctly
   <script>
     function game() {
       return {
+        newGame: true,
         board: [],
         boardSize: 4,
         newBoardSize: 4,
         score: 0,
+        scoreHex: '0x0',
+        SCORE_MAX: 4294967296,
         NUM_MAX: 4294967296,
         isEditMode: false,
         editBoard: [],
@@ -161,13 +181,18 @@ Check your Browserslist config to be sure that your targets are set up correctly
         touchStartY: 0,
         touchEndX: 0,
         touchEndY: 0,
+        undoStack: [],
+        redoStack: [],
         autoMoveInterval: null,
 
         initGame() {
           this.resetGame();
+          this.undoStack = [];
         },
 
         resetGame() {
+          this.updateHistory();
+          this.newGame = true;
           this.boardSize = this.newBoardSize;
           this.board = Array(Number(this.boardSize)).fill().map(() => Array(Number(this.boardSize)).fill(0));
           this.score = 0;
@@ -178,6 +203,7 @@ Check your Browserslist config to be sure that your targets are set up correctly
         toggleEditMode() {
           this.isEditMode = !this.isEditMode;
           if (this.isEditMode) {
+            this.scoreHex = `0x${this.score.toString(16).toUpperCase()}`;
             this.editBoard = this.board.map(row => row.map(cell => cell ? Math.floor(Math.log2(cell)) : 0));
           } else {
             if (this.isGameOver()) {
@@ -189,9 +215,44 @@ Check your Browserslist config to be sure that your targets are set up correctly
         editModeInput(row, col, value) {
           value = value.replace(/[^0-9]/g, '');
           value = value ? parseInt(value) : 0;
-          value = Math.min(value, 32);
+          value = Math.min(value, Math.floor(Math.log2(this.NUM_MAX)));
           this.editBoard[row][col] = value;
           this.board = this.editBoard.map(row => row.map(cell => cell ? Math.pow(2, cell) : 0));
+        },
+
+        editModeScoreInput(value) {
+          value = value.replace(/[^0-9A-Fa-f]/g, '');
+          value = value ? parseInt(value, 16) : 0;
+          value = Math.min(value, this.SCORE_MAX);
+          this.score = value;
+          this.scoreHex = `0x${this.score.toString(16).toUpperCase()}`;
+        },
+
+        updateHistory(board = this.board, score = this.score) {
+          if (this.newGame && this.redoStack.length == 0) {
+            this.undoStack = [];
+            this.newGame = false;
+          }
+          this.undoStack.push({ board, score });
+          this.redoStack = [];
+        },
+
+        undo() {
+          if (this.undoStack.length > 0) {
+            this.redoStack.push({ board: this.board, score: this.score });
+            const { board, score } = this.undoStack.pop();
+            this.board = board;
+            this.score = score;
+          }
+        },
+
+        redo() {
+          if (this.redoStack.length > 0) {
+            this.undoStack.push({ board: this.board, score: this.score });
+            const { board, score } = this.redoStack.pop();
+            this.board = board;
+            this.score = score;
+          }
         },
 
         addNewTile() {
@@ -242,11 +303,8 @@ Check your Browserslist config to be sure that your targets are set up correctly
 
           if (direction === null) return;
 
-          if (this.move(direction)) {
-            this.addNewTile();
-            if (this.isGameOver()) {
-              alert('Game Over!');
-            }
+          if (this.move(direction) && this.isGameOver()) {
+            alert('Game Over!');
           }
         },
 
@@ -276,16 +334,16 @@ Check your Browserslist config to be sure that your targets are set up correctly
                 break;
             }
 
-            if (this.move(direction)) {
-              this.addNewTile();
-              if (this.isGameOver()) {
-                alert('Game Over!');
-              }
+            if (this.move(direction) && this.isGameOver()) {
+              alert('Game Over!');
             }
           }
         },
 
         move(direction) {
+          const oldBoard = this.board.map(row => row.slice());
+          const oldScore = this.score;
+
           let moved = false;
           const reverse = ['up', 'right'].includes(direction);
           const transpose = ['up', 'down'].includes(direction);
@@ -309,6 +367,12 @@ Check your Browserslist config to be sure that your targets are set up correctly
           }
 
           this.board = board;
+
+          if (moved) {
+            this.updateHistory(oldBoard, oldScore);
+            this.addNewTile();
+          }
+
           return moved;
         },
 
@@ -318,6 +382,7 @@ Check your Browserslist config to be sure that your targets are set up correctly
             if (newRow[i] === newRow[i + 1] && newRow[i] * 2 <= this.NUM_MAX) {
               newRow[i] *= 2;
               this.score += newRow[i];
+              this.score = Math.min(this.score, this.SCORE_MAX);
               newRow.splice(i + 1, 1);
             }
           }
@@ -390,13 +455,10 @@ Check your Browserslist config to be sure that your targets are set up correctly
             clearInterval(this.autoMoveInterval);
             this.autoMoveInterval = null;
           }
-          if (this.move(move)) {
-            this.addNewTile();
-            if (this.isGameOver()) {
-              clearInterval(this.autoMoveInterval);
-              this.autoMoveInterval = null;
-              alert('Game Over!');
-            }
+          if (this.move(move) && this.isGameOver()) {
+            clearInterval(this.autoMoveInterval);
+            this.autoMoveInterval = null;
+            alert('Game Over!');
           }
         },
       };
@@ -455,23 +517,105 @@ Check your Browserslist config to be sure that your targets are set up correctly
       }
 
       function calcScores(board) {
+        if (size === 4) {
+          let score = 0;
+          for (let i = 0; i < size; i++) {
+            for (let j = 0; j < size; j++) {
+              if (board[i][j] === 0) {
+                score++;
+              }
+            }
+          }
+          return score;
+        }
         let score = 0;
+        let maxNum = 0;
         for (let i = 0; i < size; i++) {
           for (let j = 0; j < size; j++) {
+            maxNum = Math.max(board[i][j], maxNum);
             if (board[i][j] === 0) {
-              score++;
-            } else if (i + 1 < size && board[i][j] === board[i + 1][j]) {
-              score++;
-            } else if (j + 1 < size && board[i][j] === board[i][j + 1]) {
-              score++;
+              score += 1;
+              if (i + 1 < size && board[i + 1][j] === 0) {
+                score += 3;
+              }
+              if (j + 1 < size && board[i][j + 1] === 0) {
+                score += 3;
+              }
+            } else {
+              if (board[i][j] == 2) {
+                if ((i - 1 < 0 || (board[i - 1][j] !== 0 && board[i - 1][j] !== 2))
+                  && (i + 1 >= size || (board[i + 1][j] !== 0 && board[i + 1][j] !== 2))
+                  && (j - 1 < 0 || (board[i][j - 1] !== 0 && board[i][j - 1] !== 2))
+                  && (j + 1 >= size || (board[i][j + 1] !== 0 && board[i][j + 1] !== 2))) {
+                  score -= 3;
+                }
+              } else if (i + 1 < size && board[i][j] === board[i + 1][j]
+                || j + 1 < size && board[i][j] === board[i][j + 1]
+              ) {
+                score += 5;
+              }
+            }
+          }
+        }
+        if (maxNum > 2) {
+          for (let i = 0; i < size; i++) {
+            if (board[i][0] === maxNum || board[i][size - 1] === maxNum) {
+              score += 6;
+            }
+          }
+          for (let j = 0; j < size; j++) {
+            if (board[0][j] === maxNum || board[size - 1][j] === maxNum) {
+              score += 6;
             }
           }
         }
         return score;
       }
 
+      function getBestMove(board, depth) {
+        if (depth === 0) {
+          return [null, calcScores(board)];
+        }
+
+        let bestMove = null;
+        let maxScore = -1048576;
+
+        for (const direction of directions) {
+          const [moved, newBoard] = moveBoard(board, direction);
+          if (!moved) continue;
+          const emptyCells = [];
+          for (let i = 0; i < size; i++) {
+            for (let j = 0; j < size; j++) {
+              if (newBoard[i][j] === 0) {
+                emptyCells.push({ i, j });
+              }
+            }
+          }
+          let avgScore = 0;
+          for (const { i, j } of emptyCells) {
+            let board = newBoard.map(row => row.slice());
+            board[i][j] = 2;
+            const [_, score] = getBestMove(board, depth - 1);
+            avgScore += score;
+          }
+          avgScore /= emptyCells.length;
+          if (avgScore > maxScore) {
+            maxScore = avgScore;
+            bestMove = direction;
+          }
+        }
+
+        return [bestMove, maxScore];
+      }
+
+
+      if (size === 4) {
+        const [bestMove] = getBestMove(board, 3);
+        return bestMove || null;
+      }
+
       let bestMove = null;
-      let maxScore = -1;
+      let maxScore = -1048576;
 
       for (const direction of directions) {
         const [moved, newBoard] = moveBoard(board, direction);
