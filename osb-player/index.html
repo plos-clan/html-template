@@ -78,7 +78,17 @@
     <div id="Pass"></div>
     <div id="Foreground"></div>
   </div>
-  <input type="file" id="fileInput" style="margin: 10px; font-size: xx-large;" />
+  <div id="hide-it">
+    <input type="file" id="fileInput" style="margin: 10px; font-size: xx-large; display: block;" />
+    <button style="margin: 10px; font-size: x-large; display: block;"
+      onclick="load_url('43513 Starving Trancer feat. MAKI - only my railgun.osz')">43513 Starving Trancer feat. MAKI -
+      only my railgun</button>
+    <button style="margin: 10px; font-size: x-large; display: block;"
+      onclick="load_url('2254087 Zachz Winner - doodle.osz')">2254087 Zachz Winner - doodle</button>
+    <button style="margin: 10px; font-size: x-large; display: block;"
+      onclick="load_url('2067764 YOASOBI - Yuusha.osz')">2067764 YOASOBI - Yuusha</button>
+  </div>
+
   <script>
     window.onload = window.onresize = function () {
       var div = document.getElementById('body');
@@ -436,7 +446,17 @@
         div.sb_rh = img.naturalHeight;
         sbSetPosition(div, event.origin, event.x, event.y, img.naturalWidth, img.naturalHeight);
         img.onload = null;
-        storyboard_elements[event.id] = div;
+        const f = () => {
+          div.style.display = 'block';
+          div.sb_ready = true;
+          storyboard_elements[event.id] = div;
+        };
+        const time = event.starttime - (Date.now() - playStartTime);
+        if (time > 0) {
+          setTimeout(f, time);
+        } else {
+          f();
+        }
       };
       return div;
     }
@@ -455,7 +475,17 @@
         const iteration = event.looptype === 'LoopForever' ? 'infinite' : '1';
         div.style.animation = `${event.frameDelay * count}ms steps(1) ${iteration} storyboard-${event.id}`;
         div.style.backgroundImage = `url(${url})`;
-        storyboard_elements[event.id] = div;
+        const f = () => {
+          div.style.display = 'block';
+          div.sb_ready = true;
+          storyboard_elements[event.id] = div;
+        };
+        const time = event.starttime - (Date.now() - playStartTime);
+        if (time > 0) {
+          setTimeout(f, time);
+        } else {
+          f();
+        }
       });
       return div;
     }
@@ -472,7 +502,7 @@
         return;
       }
       const time = Date.now() - playStartTime;
-      while (queue.start.length && queue.start[0].starttime <= time + 1) {
+      while (queue.start.length && queue.start[0].starttime <= time + 5) {
         const event = queue.start.shift()
         containers[event.layer]?.appendChild(event.type === 'Sprite' ? createSpriteImg(event) : createAnimationDiv(event));
       }
@@ -490,10 +520,6 @@
         let color_r = element.sb_color_r, color_g = element.sb_color_g, color_b = element.sb_color_b, color_add = element.sb_color_add;
         let transform = '';
         for (let cmd of event.commands) {
-          if (element.sb_ready === false) {
-            element.style.display = 'block';
-            element.sb_ready = true;
-          }
           switch (cmd.event) {
             case 'M': {
               const x1 = cmd.params[0];
@@ -731,10 +757,8 @@
       });
     }
 
-    function load_file(event) {
-      const file = event.target.files[0];
-      if (!file) return;
-      document.getElementById('fileInput').style.display = 'none';
+    function load_file(file) {
+      document.getElementById('hide-it').style.display = 'none';
       document.getElementById('body').style.display = 'block';
       const reader = new FileReader();
       reader.onload = function (e) {
@@ -762,7 +786,19 @@
       reader.readAsArrayBuffer(file);
     }
 
-    document.getElementById('fileInput').addEventListener('change', load_file);
+    function load_url(url) {
+      fetch(url).then(response => {
+        response.blob().then(blob => load_file(blob));
+      });
+    }
+
+    function on_upload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      load_file(file);
+    }
+
+    document.getElementById('fileInput').addEventListener('change', on_upload);
   </script>
 </body>
 
