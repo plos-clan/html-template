@@ -92,10 +92,9 @@
     }
 
     function load_audio_file(content) {
-      playStartTime = Date.now();
       audio = new Audio(URL.createObjectURL(new Blob([content])));
       audio.onplay = function () {
-        playStartTime = Date.now() - 30 * 1000;
+        playStartTime = Date.now();
       };
       audio.onended = function () {
         playStartTime = -1;
@@ -214,6 +213,7 @@
       e.sb_h = null;
       e.sb_rw = null;
       e.sb_rh = null;
+      e.sb_transform = '';
       sbSetPosition(e, event.origin, event.x, event.y, null, null);
       return e;
     }
@@ -274,6 +274,7 @@
       for (let id in storyboard_elements) {
         const element = storyboard_elements[id];
         const event = element.sb_event;
+        let transform = '';
         for (let cmd of event.commands) {
           if (cmd.starttime > time) continue;
           if (element.sb_ready === false) {
@@ -331,7 +332,7 @@
               const r1 = cmd.params[0];
               const r2 = cmd.params[1];
               const r = sbInterpolation(r1, r2, cmd.starttime, cmd.endtime, time, cmd.easing);
-              element.style.transform = `rotate(${r}rad)`;
+              transform += ` rotate(${r}rad)`;
               break;
             }
             case 'C': {
@@ -347,7 +348,19 @@
               element.style.filter = `rgb(${r}, ${g}, ${b})`;
               break;
             }
+            case 'P': {
+              switch (cmd.params[0]) {
+                case 'H': transform += ' scaleX(-1)'; break;
+                case 'V': transform += ' scaleY(-1)'; break;
+                case 'A': /* 暂时不支持 */ break;
+              }
+              break;
+            }
           }
+        }
+        if (element.sb_transform !== transform) {
+          element.style.transform = transform;
+          element.sb_transform = transform;
         }
       }
       requestAnimationFrame(updateStoryboard);
