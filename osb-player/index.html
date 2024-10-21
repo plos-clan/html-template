@@ -8,16 +8,16 @@
   <script src="jszip.js"></script>
 </head>
 
-<body style="margin: 0; padding: 0;">
+<body style="margin: 0; padding: 0; background-color: #000;">
   <div id="body" style="position: relative; width: 640px; height: 480px; overflow: hidden; display: none;">
     <div id="Background" style="position: absolute; width: 100%; height: 100%;"></div>
     <div id="Fail" style="position: absolute; width: 100%; height: 100%;"></div>
     <div id="Pass" style="position: absolute; width: 100%; height: 100%;"></div>
     <div id="Foreground" style="position: absolute; width: 100%; height: 100%;"></div>
   </div>
-  <input type="file" id="fileInput" style="margin: 10px;" />
+  <input type="file" id="fileInput" style="margin: 10px; font-size: xx-large;" />
   <script>
-    window.onload = function () {
+    window.onload = window.onresize = function () {
       var div = document.getElementById('body');
       var scale = Math.min(window.innerWidth / 640, window.innerHeight / 480);
       div.style.width = 640 * scale + 'px';
@@ -258,14 +258,14 @@
           type: head[0],
           layer: head[1],
           origin: head[2], // 图像的原点
-          filepath: head[3].replace('\\', '/'),
+          filepath: head[3].replace(/\\/g, '/'),
           x: head[4],
           y: head[5],
         } : {
           type: head[0],
           layer: head[1],
           origin: head[2], // 图像的原点
-          filepath: head[3].replace('\\', '/'),
+          filepath: head[3].replace(/\\/g, '/'),
           x: head[4],
           y: head[5],
           frameCount: head[6],
