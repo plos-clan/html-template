@@ -15,15 +15,46 @@
       -o-user-drag: none;
       user-drag: none;
     }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #000;
+    }
+
+    #body {
+      position: relative;
+      width: 640px;
+      height: 480px;
+      overflow: hidden;
+      display: none;
+    }
+
+    #Background,
+    #Fail,
+    #Pass,
+    #Foreground {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    #Background>div,
+    #Fail>div,
+    #Pass>div,
+    #Foreground>div {
+      overflow: hidden;
+    }
   </style>
 </head>
 
-<body style="margin: 0; padding: 0; background-color: #000;">
-  <div id="body" style="position: relative; width: 640px; height: 480px; overflow: hidden; display: none;">
-    <div id="Background" style="position: absolute; width: 100%; height: 100%;"></div>
-    <div id="Fail" style="position: absolute; width: 100%; height: 100%;"></div>
-    <div id="Pass" style="position: absolute; width: 100%; height: 100%;"></div>
-    <div id="Foreground" style="position: absolute; width: 100%; height: 100%;"></div>
+<body>
+  <div id="body">
+    <div id="Background"></div>
+    <div id="Fail"></div>
+    <div id="Pass"></div>
+    <div id="Foreground"></div>
   </div>
   <input type="file" id="fileInput" style="margin: 10px; font-size: xx-large;" />
   <script>
@@ -45,11 +76,26 @@
     let audio = null;
     const body = document.getElementById('body');
     const queue = { start: [], stop: [], now: [] };
+    const containers = {
+      'Background': document.getElementById('Background'),
+      'Fail': document.getElementById('Fail'),
+      'Pass': document.getElementById('Pass'),
+      'Foreground': document.getElementById('Foreground'),
+    };
+
+    const imageURLs = {};
+    function getSbImageURL(filepath) {
+      if (!imageURLs[filepath]) {
+        imageURLs[filepath] = URL.createObjectURL(new Blob([files[filepath]]));
+      }
+      return imageURLs[filepath];
+    }
 
     function load_audio_file(content) {
+      playStartTime = Date.now();
       audio = new Audio(URL.createObjectURL(new Blob([content])));
       audio.onplay = function () {
-        playStartTime = Date.now();
+        playStartTime = Date.now() - 30 * 1000;
       };
       audio.onended = function () {
         playStartTime = -1;
@@ -64,14 +110,11 @@
       } else {
         element.sb_origin = origin;
       }
-      x = x === null ? element.sb_x : x / 640 * 100;
-      y = y === null ? element.sb_y : y / 480 * 100;
-      w = w === null ? element.sb_w : w / 640 * 100;
-      h = h === null ? element.sb_h : h / 480 * 100;
-      element.sb_x = x;
-      element.sb_y = y;
-      element.sb_w = w;
-      element.sb_h = h;
+      element.sb_x = x = x === null ? element.sb_x : x / 640 * 100;
+      element.sb_y = y = y === null ? element.sb_y : y / 480 * 100;
+      element.sb_w = w = w === null ? element.sb_w : w / 640 * 100;
+      element.sb_h = h = h === null ? element.sb_h : h / 480 * 100;
+      if (w === null || h === null) return;
       switch (origin) {
         case 'Centre': x -= w / 2; y -= h / 2; break;
         case 'CentreLeft': y -= h / 2; break;
@@ -89,7 +132,7 @@
     }
 
     function sbSetScale(element, x, y) {
-      sbSetPosition(element, null, null, null, element.naturalWidth * x, element.naturalHeight * y);
+      sbSetPosition(element, null, null, null, element.sb_rw * x, element.sb_rh * y);
     }
 
     function sbInterpolation(v1, v2, starttime, endtime, time, easing) {
@@ -111,6 +154,102 @@
       };
     }
 
+    // 图片大小必须相同
+    const spriteSheets = {};
+    async function createSpriteSheet(imageBuffers, name) {
+      const sprite = spriteSheets[name];
+      if (sprite) {
+        if (sprite.status === 'ready') return Promise.resolve(sprite.value);
+        return sprite.promise;
+      }
+      const promise = new Promise(resolve => {
+        Promise.all(imageBuffers.map(buffer => new Promise((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => resolve(img);
+          img.onerror = reject;
+          img.src = getSbImageURL(buffer);
+        }))).then(images => {
+          const canvas = document.createElement('canvas');
+          canvas.width = images.reduce((sum, img) => sum + img.width, 0);
+          canvas.height = Math.max(...images.map(img => img.height));
+          const ctx = canvas.getContext('2d');
+          images.reduce((xoff, img) => {
+            ctx.drawImage(img, xoff, 0);
+            return xoff + img.width;
+          }, 0);
+          canvas.toBlob(blob => {
+            const value = {
+              width: images[0].width,
+              height: images[0].height,
+              count: images.length,
+              url: URL.createObjectURL(blob),
+            };
+            spriteSheets[name] = { status: 'ready', value };
+            resolve(value);
+          }, 'image/bmp');
+        });
+      });
+      spriteSheets[name] = { status: 'pending', promise };
+      return promise;
+    }
+
+    // 预加载动画对象
+    async function loadAnimation(event) {
+      const [basename, extname] = event.filepath.split('.');
+      const imageBuffers = Array.from({ length: event.frameCount }, (_, n) => `${basename}${n}.${extname}`);
+      return createSpriteSheet(imageBuffers, name);
+    }
+
+    function createStoryboardElement(tagName, event) {
+      const e = document.createElement(tagName);
+      e.sb_event = event;
+      e.id = `storyboard-element-${event.id}`;
+      e.style.position = 'absolute';
+      e.style.zIndex = event.id;
+      e.style.display = 'none';
+      e.sb_ready = false;
+      e.sb_x = null;
+      e.sb_y = null;
+      e.sb_w = null;
+      e.sb_h = null;
+      e.sb_rw = null;
+      e.sb_rh = null;
+      sbSetPosition(e, event.origin, event.x, event.y, null, null);
+      return e;
+    }
+
+    function createSpriteImg(event) {
+      const img = createStoryboardElement('img', event);
+      img.src = event.type === 'Sprite' ? getSbImageURL(event.filepath) : '';
+      img.onload = function () {
+        img.sb_rw = img.naturalWidth;
+        img.sb_rh = img.naturalHeight;
+        sbSetScale(img, 1, 1);
+        img.onload = null;
+        storyboard_elements[event.id] = img;
+      };
+      return img;
+    }
+
+    function createAnimationDiv(event) {
+      const div = createStoryboardElement('div', event);
+      loadAnimation(event).then(({ width, height, count, url }) => {
+        div.sb_rw = width;
+        div.sb_rh = height;
+        sbSetScale(div, 1, 1);
+        div.style.backgroundSize = `${count * 100}% 100%`;
+        const list = Array.from({ length: count }, (_, n) => `${n / count * 100}% { background-position-x: -${n * 100}%; }`);
+        const keyframes = document.createElement('style');
+        keyframes.innerHTML = `@keyframes storyboard-${event.id} { ${list.join(' ')} }`;
+        div.appendChild(keyframes);
+        const iteration = event.looptype === 'LoopForever' ? 'infinite' : '1';
+        div.style.animation = `${event.frameDelay * count}ms steps(1) ${iteration} storyboard-${event.id}`;
+        div.style.backgroundImage = `url(${url})`;
+        storyboard_elements[event.id] = div;
+      });
+      return div;
+    }
+
     function updateStoryboard() {
       if (playStartTime < 0) {
         playStartTime = 0;
@@ -123,54 +262,24 @@
         return;
       }
       const time = Date.now() - playStartTime;
-      const now_start = [];
-      const now_stop = [];
-      while (queue.start.length && queue.start[0].starttime <= time) {
-        now_start.push(queue.start.shift());
+      while (queue.start.length && queue.start[0].starttime <= time + 1) {
+        const event = queue.start.shift()
+        containers[event.layer]?.appendChild(event.type === 'Sprite' ? createSpriteImg(event) : createAnimationDiv(event));
       }
       while (queue.stop.length && queue.stop[0].endtime <= time) {
-        now_stop.push(queue.stop.shift());
-      }
-      for (let event of now_start) {
-        const container = document.getElementById(event.layer);
-        if (container) {
-          const img = document.createElement('img');
-          storyboard_elements[event.id] = img;
-          img.id = `storyboard-element-${event.id}`;
-          img.src = event.type === 'Sprite' ? URL.createObjectURL(new Blob([files[event.filepath]])) : '';
-          img.style.position = 'absolute';
-          img.style.zIndex = event.id;
-          img.display = 'none';
-          img.sb_ready = false;
-          sbSetPosition(img, event.origin, event.x, event.y, 640, 480);
-          img.onload = function () {
-            sbSetPosition(img, event.origin, event.x, event.y, img.naturalWidth, img.naturalHeight);
-            img.onload = null;
-            img.display = 'block';
-            img.sb_ready = true;
-          };
-          container.appendChild(img);
-        }
-      }
-      for (let event of now_stop) {
+        const event = queue.stop.shift()
         storyboard_elements[event.id]?.remove();
+        delete storyboard_elements[event.id];
       }
-      queue.now.push(...now_start);
-      queue.now = queue.now.filter(event => !now_stop.includes(event));
-      for (let event of queue.now) {
-        const img = storyboard_elements[event.id];
-        if (!img) continue;
-        if (event.type === 'Animation') {
-          const [basename, extname] = event.filepath.split('.');
-          let n = Math.floor((time - event.starttime) / event.frameDelay);
-          if (n >= event.frameCount) n = event.looptype === 'LoopForever' ? n % event.frameCount : event.frameCount;
-          if (n !== img.nframe) {
-            img.nframe = n;
-            img.src = URL.createObjectURL(new Blob([files[`${basename}${n}.${extname}`]]));
-          }
-        }
+      for (let id in storyboard_elements) {
+        const element = storyboard_elements[id];
+        const event = element.sb_event;
         for (let cmd of event.commands) {
           if (cmd.starttime > time) continue;
+          if (element.sb_ready === false) {
+            element.style.display = 'block';
+            element.sb_ready = true;
+          }
           switch (cmd.event) {
             case 'M': {
               const x1 = cmd.params[0];
@@ -178,35 +287,35 @@
               const x2 = cmd.params[2];
               const y2 = cmd.params[3];
               const { x, y } = sbPosInterpolation(x1, y1, x2, y2, cmd.starttime, cmd.endtime, time, cmd.easing);
-              sbSetPosition(img, event.origin, x, y, null, null);
+              sbSetPosition(element, event.origin, x, y, null, null);
               break;
             }
             case 'MX': {
               const x1 = cmd.params[0];
               const x2 = cmd.params[1];
               const x = sbInterpolation(x1, x2, cmd.starttime, cmd.endtime, time, cmd.easing);
-              sbSetPosition(img, event.origin, x, null, null, null);
+              sbSetPosition(element, event.origin, x, null, null, null);
               break;
             }
             case 'MY': {
               const y1 = cmd.params[0];
               const y2 = cmd.params[1];
               const y = sbInterpolation(y1, y2, cmd.starttime, cmd.endtime, time, cmd.easing);
-              sbSetPosition(img, event.origin, null, y, null, null);
+              sbSetPosition(element, event.origin, null, y, null, null);
               break;
             }
             case 'F': {
               const o1 = cmd.params[0];
               const o2 = cmd.params[1];
               const o = sbInterpolation(o1, o2, cmd.starttime, cmd.endtime, time, cmd.easing);
-              img.style.opacity = o;
+              element.style.opacity = o;
               break;
             }
             case 'S': {
               const v1 = cmd.params[0];
               const v2 = cmd.params[1];
               const v = sbInterpolation(v1, v2, cmd.starttime, cmd.endtime, time, cmd.easing);
-              sbSetScale(img, v, v);
+              sbSetScale(element, v, v);
               break;
             }
             case 'V': {
@@ -215,14 +324,14 @@
               const x2 = cmd.params[2];
               const y2 = cmd.params[3];
               const { x, y } = sbPosInterpolation(x1, y1, x2, y2, cmd.starttime, cmd.endtime, time, cmd.easing);
-              sbSetScale(img, x, y);
+              sbSetScale(element, x, y);
               break;
             }
             case 'R': {
               const r1 = cmd.params[0];
               const r2 = cmd.params[1];
               const r = sbInterpolation(r1, r2, cmd.starttime, cmd.endtime, time, cmd.easing);
-              img.style.transform = `rotate(${r}rad)`;
+              element.style.transform = `rotate(${r}rad)`;
               break;
             }
             case 'C': {
@@ -235,7 +344,7 @@
               const r = sbInterpolation(r1, r2, cmd.starttime, cmd.endtime, time, cmd.easing);
               const g = sbInterpolation(g1, g2, cmd.starttime, cmd.endtime, time, cmd.easing);
               const b = sbInterpolation(b1, b2, cmd.starttime, cmd.endtime, time, cmd.easing);
-              img.style.filter = `rgb(${r}, ${g}, ${b})`;
+              element.style.filter = `rgb(${r}, ${g}, ${b})`;
               break;
             }
           }
@@ -339,7 +448,10 @@
         event.endtime = Math.max(...event.commands.map(cmd => cmd.endtime));
         return event;
       });
-      initStoryboard(objects);
+      const animations = objects.filter(obj => obj.type === 'Animation');
+      Promise.all(animations.map(loadAnimation)).then(() => {
+        initStoryboard(objects);
+      });
     }
 
     function load_file(event) {
