@@ -520,6 +520,7 @@
         let color_r = element.sb_color_r, color_g = element.sb_color_g, color_b = element.sb_color_b, color_add = element.sb_color_add;
         let transform = '';
         for (let cmd of event.commands) {
+          if (event.starttime < time) break;
           switch (cmd.event) {
             case 'M': {
               const x1 = cmd.params[0];
@@ -592,7 +593,7 @@
               break;
             }
             case 'P': {
-              if (event.starttime < time || time > event.endtime) break;
+              if (time > event.endtime) break;
               switch (cmd.params[0]) {
                 case 'H': transform += ' scaleX(-1)'; break;
                 case 'V': transform += ' scaleY(-1)'; break;
