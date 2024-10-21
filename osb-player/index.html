@@ -19,6 +19,7 @@
     body {
       margin: 0;
       padding: 0;
+      overflow: hidden;
       background-color: #000;
     }
 
@@ -384,7 +385,7 @@
 
     function load_osb_file(content) {
       const osb = new TextDecoder().decode(content);
-      const lines = osb.split('\n').map((line) => line.trim()).filter((line) => line && !line.startsWith('//') && !line.startsWith('[')).map((line) => line.split(',').map((part) => {
+      const lines = osb.split('\n').filter(line => line && !line.startsWith('//') && !line.startsWith('[')).map(line => `${line.match(/^(\s*)/)[0].length},${line.trim()}`).map(line => line.split(',').map(part => {
         part = part.trim();
         if (part.startsWith('"') && part.endsWith('"')) {
           return part.slice(1, -1);
@@ -395,13 +396,14 @@
         }
       }));
       let next_id = 0;
-      const objects = ((lines) => {
+      const objects = (lines => {
         const objects = [];
         let current = null;
-        lines.forEach((line) => {
-          if (line[0] === 'Sprite' || line[0] === 'Animation') {
+        lines.forEach(line => {
+          if (line[0] === 0) {
+            if (line[1] !== 'Sprite' && line[1] !== 'Animation') console.log(`未实现：${line[1]}`);
             if (current) objects.push(current);
-            current = [line];
+            current = [line.slice(1)];
           } else if (current) {
             current.push(line);
           }
@@ -411,52 +413,79 @@
       })(lines).map((object) => {
         const head = object[0];
         const data = object.slice(1);
-        var event = head[0] == 'Sprite' ? {
+        const event = {
+          id: next_id++,
           type: head[0],
           layer: head[1],
           origin: head[2], // 图像的原点
           filepath: head[3].replace(/\\/g, '/'),
           x: head[4],
           y: head[5],
-        } : {
-          type: head[0],
-          layer: head[1],
-          origin: head[2], // 图像的原点
-          filepath: head[3].replace(/\\/g, '/'),
-          x: head[4],
-          y: head[5],
-          frameCount: head[6],
-          frameDelay: head[7],
-          looptype: head[8],
+          commands: [],
         };
-        event.id = next_id++;
-        event.commands = [];
-        data.forEach((line) => ((list, line) => {
+        if (head[0] === 'Animation') {
+          event.frameCount = head[6];
+          event.frameDelay = head[7];
+          event.looptype = head[8];
+        }
+        const parse = (relative_time, nline) => {
+          let line = data[nline];
+          if (line[1] === 'L') { // Loop
+            let starttime = relative_time + line[2];
+            let loopcount = line[3];
+            const indent = data[nline][0];
+            let j = 0;
+            let endtimes = [];
+            for (let i = nline + 1; loopcount > 0;) {
+              if (i >= data.length || data[i][0] <= indent) {
+                j = i;
+                i = nline + 1;
+                starttime = Math.max(...endtimes);
+                endtimes = [];
+                loopcount--;
+                continue;
+              }
+              const [next_i, endtime] = parse(starttime, i);
+              i = next_i;
+              endtimes.push(endtime);
+            }
+            return [j, starttime];
+          }
           const paranums = { 'F': 2, 'M': 4, 'MX': 2, 'MY': 2, 'S': 2, 'V': 4, 'R': 2, 'C': 6, 'P': 1 };
-          const paranum = paranums[line[0]];
+          const paranum = paranums[line[1]];
           if (!paranum) return;
-          const data = {
-            event: line[0],
-            easing: line[1],
-            starttime: line[2],
-            endtime: line[3] !== '' ? line[3] : line[2],
+          const event_data = {
+            event: line[1],
+            easing: line[2],
+            starttime: relative_time + line[3],
+            endtime: relative_time + (line[4] !== '' ? line[4] : line[3]),
           };
-          line = line.slice(4);
+          let last_endtime = 0;
+          line = line.slice(5);
           if (line.length < paranum) {
             for (let i = 0; line.length < paranum; i++) {
               line.push(line[i]);
             }
-            const d = { ...data };
+            const d = { ...event_data };
             d.params = line;
-            list.push(d);
+            event.commands.push(d);
+            last_endtime = event_data.endtime;
           } else {
             for (let i = 0; i < line.length / paranum; i++) {
-              const d = { ...data };
+              const d = { ...event_data };
               d.params = line.slice(i * paranum, (i + 1) * paranum);
-              list.push(d);
+              event.commands.push(d);
+              last_endtime = event_data.endtime;
+              const duration = event_data.endtime - event_data.starttime;
+              event_data.starttime = event_data.endtime;
+              event_data.endtime += duration;
             }
           }
-        })(event.commands, line));
+          return [nline + 1, last_endtime];
+        };
+        for (let nline = 0; nline < data.length;) {
+          nline = parse(0, nline)[0];
+        }
         event.starttime = Math.min(...event.commands.map(cmd => cmd.starttime));
         event.endtime = Math.max(...event.commands.map(cmd => cmd.endtime));
         return event;
