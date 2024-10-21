@@ -6,6 +6,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title></title>
   <script src="jszip.js"></script>
+  <style>
+    img {
+      user-select: none;
+      -webkit-user-drag: none;
+      -khtml-user-drag: none;
+      -moz-user-drag: none;
+      -o-user-drag: none;
+      user-drag: none;
+    }
+  </style>
 </head>
 
 <body style="margin: 0; padding: 0; background-color: #000;">
@@ -30,15 +40,21 @@
     let storyboard = [];
     let storyboard_by_starttime = [];
     let storyboard_by_endtime = [];
+    let storyboard_elements = {};
     let playStartTime = 0;
+    let audio = null;
     const body = document.getElementById('body');
     const queue = { start: [], stop: [], now: [] };
 
     function load_audio_file(content) {
-      const audio = new Audio(URL.createObjectURL(new Blob([content])));
-      audio.loop = false;
+      audio = new Audio(URL.createObjectURL(new Blob([content])));
+      audio.onplay = function () {
+        playStartTime = Date.now();
+      };
+      audio.onended = function () {
+        playStartTime = -1;
+      };
       audio.play();
-      playStartTime = Date.now();
     }
 
     function sbSetPosition(element, origin, x, y, w, h) {
@@ -96,6 +112,12 @@
     }
 
     function updateStoryboard() {
+      if (playStartTime < 0) {
+        playStartTime = 0;
+        initStoryboard();
+        audio.play();
+        return;
+      }
       if (playStartTime === 0) {
         requestAnimationFrame(updateStoryboard);
         return;
@@ -113,29 +135,30 @@
         const container = document.getElementById(event.layer);
         if (container) {
           const img = document.createElement('img');
+          storyboard_elements[event.id] = img;
           img.id = `storyboard-element-${event.id}`;
           img.src = event.type === 'Sprite' ? URL.createObjectURL(new Blob([files[event.filepath]])) : '';
           img.style.position = 'absolute';
           img.style.zIndex = event.id;
           img.display = 'none';
-          img.sb_hide = true;
+          img.sb_ready = false;
           sbSetPosition(img, event.origin, event.x, event.y, 640, 480);
           img.onload = function () {
             sbSetPosition(img, event.origin, event.x, event.y, img.naturalWidth, img.naturalHeight);
             img.onload = null;
-            img.sb_loaded = true;
+            img.display = 'block';
+            img.sb_ready = true;
           };
           container.appendChild(img);
         }
       }
       for (let event of now_stop) {
-        const element = document.getElementById(`storyboard-element-${event.id}`);
-        if (element) element.remove();
+        storyboard_elements[event.id]?.remove();
       }
       queue.now.push(...now_start);
       queue.now = queue.now.filter(event => !now_stop.includes(event));
       for (let event of queue.now) {
-        const img = document.getElementById(`storyboard-element-${event.id}`);
+        const img = storyboard_elements[event.id];
         if (!img) continue;
         if (event.type === 'Animation') {
           const [basename, extname] = event.filepath.split('.');
@@ -148,10 +171,6 @@
         }
         for (let cmd of event.commands) {
           if (cmd.starttime > time) continue;
-          if (img.sb_hide) {
-            img.display = 'block';
-            img.sb_hide = false;
-          }
           switch (cmd.event) {
             case 'M': {
               const x1 = cmd.params[0];
@@ -223,6 +242,22 @@
         }
       }
       requestAnimationFrame(updateStoryboard);
+    }
+
+    function initStoryboard(objects = null) {
+      if (objects !== null) {
+        storyboard = objects;
+        storyboard_by_starttime = objects.slice().sort((a, b) => a.starttime - b.starttime);
+        storyboard_by_endtime = objects.slice().sort((a, b) => a.endtime - b.endtime);
+      }
+      for (let element in storyboard_elements) {
+        storyboard_elements[element].remove();
+      }
+      storyboard_elements = {};
+      queue.start = storyboard_by_starttime.slice();
+      queue.stop = storyboard_by_endtime.slice();
+      queue.now = [];
+      updateStoryboard();
     }
 
     function load_osb_file(content) {
@@ -304,13 +339,7 @@
         event.endtime = Math.max(...event.commands.map(cmd => cmd.endtime));
         return event;
       });
-      storyboard = objects;
-      storyboard_by_starttime = objects.slice().sort((a, b) => a.starttime - b.starttime);
-      storyboard_by_endtime = objects.slice().sort((a, b) => a.endtime - b.endtime);
-      queue.start = storyboard_by_starttime.slice();
-      queue.stop = storyboard_by_endtime.slice();
-      queue.now = [];
-      updateStoryboard();
+      initStoryboard(objects);
     }
 
     function load_file(event) {
