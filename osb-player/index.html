@@ -104,20 +104,20 @@
         div.style.height = 9 * scale + 'px';
         div.style.setProperty('--top', '0%');
         div.style.setProperty('--left', '12.5%');
-        document.body.style.marginLeft = (window.innerWidth - 16 * scale) / 2 + 'px';
-        document.body.style.marginRight = (window.innerWidth - 16 * scale) / 2 + 'px';
-        document.body.style.marginTop = (window.innerHeight - 9 * scale) / 2 + 'px';
-        document.body.style.marginBottom = (window.innerHeight - 9 * scale) / 2 + 'px';
+        document.body.style.paddingLeft = (window.innerWidth - 16 * scale) / 2 + 'px';
+        document.body.style.paddingRight = (window.innerWidth - 16 * scale) / 2 + 'px';
+        document.body.style.paddingTop = (window.innerHeight - 9 * scale) / 2 + 'px';
+        document.body.style.paddingBottom = (window.innerHeight - 9 * scale) / 2 + 'px';
       } else {
         var scale = Math.min(window.innerWidth / 4, window.innerHeight / 3);
         div.style.width = 4 * scale + 'px';
         div.style.height = 3 * scale + 'px';
         div.style.setProperty('--top', '0%');
         div.style.setProperty('--left', '0%');
-        document.body.style.marginLeft = (window.innerWidth - 4 * scale) / 2 + 'px';
-        document.body.style.marginRight = (window.innerWidth - 4 * scale) / 2 + 'px';
-        document.body.style.marginTop = (window.innerHeight - 3 * scale) / 2 + 'px';
-        document.body.style.marginBottom = (window.innerHeight - 3 * scale) / 2 + 'px';
+        document.body.style.paddingLeft = (window.innerWidth - 4 * scale) / 2 + 'px';
+        document.body.style.paddingRight = (window.innerWidth - 4 * scale) / 2 + 'px';
+        document.body.style.paddingTop = (window.innerHeight - 3 * scale) / 2 + 'px';
+        document.body.style.paddingBottom = (window.innerHeight - 3 * scale) / 2 + 'px';
       }
     }
 
@@ -463,6 +463,8 @@
         case 'BottomRight': origin = '100% 100%'; break;
       }
       e.style.transformOrigin = origin;
+      e.sb_ready = false;
+      storyboard_elements[event.id] = e;
       return e;
     }
 
@@ -479,7 +481,7 @@
         img.onload = null;
         const f = () => {
           div.style.display = 'block';
-          storyboard_elements[event.id] = div;
+          div.sb_ready = true;
         };
         const time = event.starttime - (Date.now() - playStartTime);
         if (time > 0) {
@@ -507,7 +509,7 @@
         div.style.backgroundImage = `url(${url})`;
         const f = () => {
           div.style.display = 'block';
-          storyboard_elements[event.id] = div;
+          div.sb_ready = true;
         };
         const time = event.starttime - (Date.now() - playStartTime);
         if (time > 0) {
@@ -543,6 +545,7 @@
       for (let id in storyboard_elements) {
         const element = storyboard_elements[id];
         const event = element.sb_event;
+        if (!element.sb_ready) continue;
         let opacity = null;
         let pos_x = null, pos_y = null;
         let scale_x = null, scale_y = null;
@@ -720,7 +723,7 @@
           type: head[0],
           layer: head[1],
           origin: head[2], // 图像的原点
-          filepath: head[3].replace(/\\/g, '/'),
+          filepath: head[3].replace(/\\/g, '/').toLowerCase(),
           x: head[4],
           y: head[5],
           commands: [],
@@ -808,7 +811,7 @@
         zip.loadAsync(e.target.result).then(function (zip) {
           const promises = [];
           zip.forEach(function (relativePath, zipEntry) {
-            const name = zipEntry.name;
+            const name = zipEntry.name.toLowerCase();
             promises.push(zipEntry.async('arraybuffer').then((content) => {
               files[name] = content;
             }));
