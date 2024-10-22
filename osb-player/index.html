@@ -56,6 +56,8 @@
     #Foreground>div {
       overflow: hidden;
 
+      --transform: '';
+
       --blend-mode: normal;
       mix-blend-mode: var(--blend-mode);
     }
@@ -72,6 +74,16 @@
 
       width: 100%;
       height: 100%;
+
+      transform: var(--transform);
+    }
+
+    #hide-it>button {
+      display: block;
+
+      margin: 10px;
+
+      font-size: large;
     }
   </style>
 </head>
@@ -85,13 +97,11 @@
   </div>
   <div id="hide-it">
     <input type="file" id="fileInput" style="margin: 10px; font-size: xx-large; display: block;" />
-    <button style="margin: 10px; font-size: x-large; display: block;"
-      onclick="load_url('43513 Starving Trancer feat. MAKI - only my railgun.osz')">43513 Starving Trancer feat. MAKI -
-      only my railgun</button>
-    <button style="margin: 10px; font-size: x-large; display: block;"
-      onclick="load_url('2254087 Zachz Winner - doodle.osz')">2254087 Zachz Winner - doodle</button>
-    <button style="margin: 10px; font-size: x-large; display: block;"
-      onclick="load_url('2067764 YOASOBI - Yuusha.osz')">2067764 YOASOBI - Yuusha</button>
+    <button onclick="load_url(`${this.innerText}.osz`)">43513 Starving Trancer feat. MAKI - only my railgun</button>
+    <button onclick="load_url(`${this.innerText}.osz`)">2254087 Zachz Winner - doodle</button>
+    <button onclick="load_url(`${this.innerText}.osz`)">2067764 YOASOBI - Yuusha</button>
+    <button onclick="load_url(`${this.innerText}.osz`)">29489 Ano Hana Cast - secret base ~Kimi ga Kureta Mono~</button>
+    <button onclick="load_url(`${this.innerText}.osz`)">1388906 Raphlesia & BilliumMoto - My Love</button>
   </div>
 
   <script>
@@ -445,6 +455,7 @@
       e.sb_pos_y = null;
       e.sb_scale_x = null;
       e.sb_scale_y = null;
+      e.sb_rotate = '';
       e.sb_transform = '';
       e.sb_color_r = null;
       e.sb_color_g = null;
@@ -502,10 +513,10 @@
         div.style.backgroundSize = `${count * 100}% 100%`;
         const list = Array.from({ length: count }, (_, n) => `${n / count * 100}% { background-position-x: -${n * 100}%; }`);
         const keyframes = document.createElement('style');
-        keyframes.innerHTML = `@keyframes storyboard-${event.id} { ${list.join(' ')} }`;
+        keyframes.innerHTML = `@keyframes storyboard-${event.id} { ${list.join(' ')} 100% { background-position-x: -${(count - 1) * 100}%; } }`;
         div.appendChild(keyframes);
         const iteration = event.looptype === 'LoopForever' ? 'infinite' : '1';
-        div.style.animation = `${event.frameDelay * count}ms steps(1) ${iteration} storyboard-${event.id}`;
+        div.style.animation = `${event.frameDelay * count}ms steps(1) ${iteration} forwards storyboard-${event.id}`;
         div.style.backgroundImage = `url(${url})`;
         const f = () => {
           div.style.display = 'block';
@@ -614,7 +625,7 @@
               const r1 = cmd.params[0];
               const r2 = cmd.params[1];
               const r = sbInterpolation(r1, r2, cmd.starttime, cmd.endtime, time, cmd.easing);
-              if (time >= cmd.starttime || rotate === null) rotate = r;
+              if (time >= cmd.starttime || rotate === null) rotate = r ? `rotate(${r}rad)` : '';
               break;
             }
             case 'C': {
@@ -632,7 +643,7 @@
               break;
             }
             case 'P': {
-              if ((time < cmd.starttime || cmd.endtime < time) && cmd.starttime !== cmd.endtime) continue;
+              if ((time < cmd.starttime || cmd.endtime < time) && (cmd.starttime !== cmd.endtime)) continue;
               switch (cmd.params[0]) {
                 case 'H': reverse_x = true; break;
                 case 'V': reverse_y = true; break;
@@ -652,9 +663,13 @@
         if (scale_x !== null && (scale_x !== element.sb_scale_x || scale_y !== element.sb_scale_y)) {
           sbSetScale(element, scale_x, scale_y);
         }
-        const transform = `${rotate ? `rotate(${rotate}rad)` : ''} ${reverse_x ? `scaleX(-1)` : ''} ${reverse_y ? `scaleY(-1)` : ''}`.trim();
+        if (rotate !== null && element.sb_rotate !== rotate) {
+          element.style.transform = rotate;
+          element.sb_rotate = rotate;
+        }
+        const transform = `${reverse_x ? `scaleX(-1)` : ''} ${reverse_y ? `scaleY(-1)` : ''}`.trim();
         if (element.sb_transform !== transform) {
-          element.style.transform = transform;
+          element.style.setProperty('--transform', transform);
           element.sb_transform = transform;
         }
         if (color_r !== null && (color_r !== element.sb_color_r || color_g !== element.sb_color_g || color_b !== element.sb_color_b)) {
@@ -739,6 +754,12 @@
             let starttime = relative_time + line[2];
             let loopcount = line[3];
             const indent = data[nline][0];
+            if (loopcount === 0) loopcount = 1;
+            if (loopcount < 0) {
+              let i = nline + 1;
+              while (i < data.length && data[i][0] > indent) i++;
+              return [i, starttime];
+            }
             let j = 0;
             let endtimes = [];
             for (let i = nline + 1; loopcount > 0;) {
@@ -798,13 +819,13 @@
       });
       const animations = objects.filter(obj => obj.type === 'Animation');
       Promise.all(animations.map(loadAnimation)).then(() => {
+        document.getElementById('hide-it').style.display = 'none';
+        document.getElementById('body').style.display = 'block';
         initStoryboard(objects);
       });
     }
 
     function load_file(file) {
-      document.getElementById('hide-it').style.display = 'none';
-      document.getElementById('body').style.display = 'block';
       const reader = new FileReader();
       reader.onload = function (e) {
         const zip = new JSZip();
@@ -832,6 +853,7 @@
     }
 
     function load_url(url) {
+      document.getElementById('hide-it').innerHTML = '<p style="font-size: xx-large; color: white;">Loading...</p>';
       fetch(url).then(response => {
         response.blob().then(blob => load_file(blob));
       });
@@ -840,6 +862,7 @@
     function on_upload(event) {
       const file = event.target.files[0];
       if (!file) return;
+      document.getElementById('hide-it').innerHTML = '<p style="font-size: xx-large; color: white;">Loading...</p>';
       load_file(file);
     }
 
