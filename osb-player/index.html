@@ -78,12 +78,22 @@
       transform: var(--transform);
     }
 
+    #hide-it {
+      user-select: none;
+    }
+
     #hide-it>button {
       display: block;
 
       margin: 10px;
 
       font-size: large;
+    }
+
+    #hide-it>p {
+      color: white;
+
+      font-size: xx-large;
     }
   </style>
 </head>
@@ -852,8 +862,18 @@
       reader.readAsArrayBuffer(file);
     }
 
+
+    function show_tips() {
+      document.getElementById('hide-it').innerHTML = [
+        'Loading...',
+        'Double-click to switch between 16:9 and 4:3.',
+        'It is normal to have lag.',
+        'Just wait patiently.',
+      ].map(text => `<p>${text}</p>`).join('');
+    }
+
     function load_url(url) {
-      document.getElementById('hide-it').innerHTML = '<p style="font-size: xx-large; color: white;">Loading...</p>';
+      show_tips();
       fetch(url).then(response => {
         response.blob().then(blob => load_file(blob));
       });
@@ -862,7 +882,7 @@
     function on_upload(event) {
       const file = event.target.files[0];
       if (!file) return;
-      document.getElementById('hide-it').innerHTML = '<p style="font-size: xx-large; color: white;">Loading...</p>';
+      show_tips();
       load_file(file);
     }
 
