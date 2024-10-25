@@ -56,6 +56,8 @@
     #Foreground>div {
       overflow: hidden;
 
+      background-size: 100% 100%;
+
       --transform: '';
 
       --blend-mode: normal;
@@ -164,12 +166,13 @@
       'Foreground': document.getElementById('Foreground'),
     };
 
-    const imageURLs = {};
-    function getSbImageURL(filepath) {
-      if (!imageURLs[filepath]) {
-        imageURLs[filepath] = URL.createObjectURL(new Blob([files[filepath]]));
+    const imageFileURLs = {};
+    // 加载文件
+    function getImageFileURL(filepath) {
+      if (!imageFileURLs[filepath]) {
+        imageFileURLs[filepath] = URL.createObjectURL(new Blob([files[filepath]]));
       }
-      return imageURLs[filepath];
+      return imageFileURLs[filepath];
     }
 
     function load_audio_file(content) {
@@ -342,7 +345,7 @@
 
     const sbApplyColorMixCache = {};
     function sbApplyColorMix(element, r, g, b) {
-      const name = JSON.stringify([element.sb_event.filepath, r, g, b])
+      const name = JSON.stringify([element.sb_event.filepath, r, g, b]);
       const entry = sbApplyColorMixCache[name];
       if (entry) {
         if (entry.status === 'ready') {
@@ -413,7 +416,7 @@
           const img = new Image();
           img.onload = () => resolve(img);
           img.onerror = reject;
-          img.src = getSbImageURL(buffer);
+          img.src = getImageFileURL(buffer);
         }))).then(images => {
           const canvas = document.createElement('canvas');
           canvas.width = images.reduce((sum, img) => sum + img.width, 0);
@@ -489,27 +492,31 @@
       return e;
     }
 
+    function sbDivSetAnimation(div, event, url, count) {
+      div.style.backgroundSize = `${count * 100}% 100%`;
+      const list = Array.from({ length: count }, (_, n) => `${n / count * 100}% { background-position-x: -${n * 100}%; }`);
+      const keyframes = document.createElement('style');
+      keyframes.innerHTML = `@keyframes storyboard-${event.id} { ${list.join(' ')} 100% { background-position-x: -${(count - 1) * 100}%; } }`;
+      div.appendChild(keyframes);
+      const iteration = event.looptype === 'LoopForever' ? 'infinite' : '1';
+      div.style.animation = `${event.frameDelay * count}ms steps(1) ${iteration} forwards storyboard-${event.id}`;
+      div.style.backgroundImage = `url(${url})`;
+    }
+
     function createSpriteImg(event) {
       const div = createStoryboardElement(event);
       const img = document.createElement('img');
       div.sb_img = img;
       div.appendChild(img);
-      img.src = event.type === 'Sprite' ? getSbImageURL(event.filepath) : '';
+      img.src = getImageFileURL(event.filepath);
       img.onload = function () {
+        img.onload = null;
         div.sb_rw = img.naturalWidth;
         div.sb_rh = img.naturalHeight;
         sbSetPosition(div, event.origin, event.x, event.y, img.naturalWidth, img.naturalHeight);
-        img.onload = null;
-        const f = () => {
-          div.style.display = 'block';
-          div.sb_ready = true;
-        };
+        const f = () => { div.style.display = 'block'; div.sb_ready = true; };
         const time = event.starttime - (Date.now() - playStartTime);
-        if (time > 0) {
-          setTimeout(f, time);
-        } else {
-          f();
-        }
+        if (time > 0) setTimeout(f, time); else f();
       };
       return div;
     }
@@ -520,24 +527,10 @@
         div.sb_rw = width;
         div.sb_rh = height;
         sbSetPosition(div, event.origin, event.x, event.y, width, height);
-        div.style.backgroundSize = `${count * 100}% 100%`;
-        const list = Array.from({ length: count }, (_, n) => `${n / count * 100}% { background-position-x: -${n * 100}%; }`);
-        const keyframes = document.createElement('style');
-        keyframes.innerHTML = `@keyframes storyboard-${event.id} { ${list.join(' ')} 100% { background-position-x: -${(count - 1) * 100}%; } }`;
-        div.appendChild(keyframes);
-        const iteration = event.looptype === 'LoopForever' ? 'infinite' : '1';
-        div.style.animation = `${event.frameDelay * count}ms steps(1) ${iteration} forwards storyboard-${event.id}`;
-        div.style.backgroundImage = `url(${url})`;
-        const f = () => {
-          div.style.display = 'block';
-          div.sb_ready = true;
-        };
+        sbDivSetAnimation(div, event, url, count);
+        const f = () => { div.style.display = 'block'; div.sb_ready = true; };
         const time = event.starttime - (Date.now() - playStartTime);
-        if (time > 0) {
-          setTimeout(f, time);
-        } else {
-          f();
-        }
+        if (time > 0) setTimeout(f, time); else f();
       });
       return div;
     }
