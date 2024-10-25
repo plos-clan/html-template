@@ -56,23 +56,23 @@
     #Foreground>div {
       overflow: hidden;
 
-      background-size: 100% 100%;
-
       --transform: '';
 
       --blend-mode: normal;
       mix-blend-mode: var(--blend-mode);
     }
 
-    #Background>div>img,
-    #Fail>div>img,
-    #Pass>div>img,
-    #Foreground>div>img {
+    #Background>div>*,
+    #Fail>div>*,
+    #Pass>div>*,
+    #Foreground>div>* {
       position: absolute;
       top: 0;
       left: 0;
 
       display: block;
+
+      background-size: 100% 100%;
 
       width: 100%;
       height: 100%;
@@ -114,6 +114,7 @@
     <button onclick="load_url(`${this.innerText}.osz`)">2067764 YOASOBI - Yuusha</button>
     <button onclick="load_url(`${this.innerText}.osz`)">29489 Ano Hana Cast - secret base ~Kimi ga Kureta Mono~</button>
     <button onclick="load_url(`${this.innerText}.osz`)">1388906 Raphlesia & BilliumMoto - My Love</button>
+    <button onclick="load_url(`${this.innerText}.osz`)">1841885 cYsmix - triangles</button>
   </div>
 
   <script>
@@ -173,6 +174,20 @@
         imageFileURLs[filepath] = URL.createObjectURL(new Blob([files[filepath]]));
       }
       return imageFileURLs[filepath];
+    }
+
+    const imageObjs = {};
+    // 加载文件
+    function getImageObj(filepath) {
+      const entry = imageObjs[filepath];
+      if (entry) return entry;
+      const promise = new Promise(resolve => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.src = getImageFileURL(filepath);
+      });
+      imageObjs[filepath] = promise;
+      return promise;
     }
 
     function load_audio_file(content) {
@@ -326,9 +341,10 @@
       if (time >= endtime || endtime === starttime) return { x: x2, y: y2 };
       if (time <= starttime) return { x: x1, y: y1 };
       const t = (time - starttime) / (endtime - starttime);
+      const v = easing_functions[easing](t);
       return {
-        x: x1 + (x2 - x1) * easing_functions[easing](t),
-        y: y1 + (y2 - y1) * easing_functions[easing](t),
+        x: x1 + (x2 - x1) * v,
+        y: y1 + (y2 - y1) * v,
       };
     }
 
@@ -336,10 +352,11 @@
       if (time >= endtime || endtime === starttime) return { x: x2, y: y2, z: z2 };
       if (time <= starttime) return { x: x1, y: y1, z: z1 };
       const t = (time - starttime) / (endtime - starttime);
+      const v = easing_functions[easing](t);
       return {
-        x: x1 + (x2 - x1) * easing_functions[easing](t),
-        y: y1 + (y2 - y1) * easing_functions[easing](t),
-        z: z1 + (z2 - z1) * easing_functions[easing](t),
+        x: x1 + (x2 - x1) * v,
+        y: y1 + (y2 - y1) * v,
+        z: z1 + (z2 - z1) * v,
       };
     }
 
@@ -348,37 +365,25 @@
       const name = JSON.stringify([element.sb_event.filepath, r, g, b]);
       const entry = sbApplyColorMixCache[name];
       if (entry) {
-        if (entry.status === 'ready') {
-          if (!element.sb_img) {
-            element.style.backgroundImage = `url(${entry.value})`;
-          } else {
-            element.sb_img.src = entry.value;
-          }
-          return;
-        }
-        entry.promise.then(url => {
-          if (!element.sb_img) {
-            element.style.backgroundImage = `url(${url})`;
-          } else {
-            element.sb_img.src = url;
-          }
-        });
+        entry.then(url => { element.sb_img.style.backgroundImage = `url(${url})`; });
         return;
       }
-      let img = Promise.resolve(element.sb_img);
-      if (!element.sb_img) {
+      let img;
+      if (element.sb_event.type === 'Sprite') {
+        img = getImageObj(element.sb_event.filepath);
+      } else {
         img = new Promise(resolve => {
           const img = new Image();
           img.onload = () => resolve(img);
           loadAnimation(element.sb_event).then(({ url }) => { img.src = url; });
-        })
+        });
       }
       const promise = new Promise(resolve => {
         img.then(img => {
           const canvas = document.createElement('canvas');
           const ctx = canvas.getContext('2d');
-          canvas.width = img.naturalWidth;
-          canvas.height = img.naturalHeight;
+          canvas.width = img.width;
+          canvas.height = img.height;
           ctx.drawImage(img, 0, 0);
           const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
           const data = imageData.data;
@@ -388,29 +393,18 @@
             data[i + 2] *= b;
           }
           ctx.putImageData(imageData, 0, 0);
-          const url = canvas.toDataURL();
-          sbApplyColorMixCache[name] = { status: 'ready', value: url };
-          resolve(url);
+          resolve(canvas.toDataURL());
         });
       });
-      promise.then(url => {
-        if (!element.sb_img) {
-          element.style.backgroundImage = `url(${url})`;
-        } else {
-          element.sb_img.src = url;
-        }
-      });
-      sbApplyColorMixCache[name] = { status: 'pending', promise };
+      promise.then(url => { element.sb_img.style.backgroundImage = `url(${url})`; });
+      sbApplyColorMixCache[name] = promise;
     }
 
     // 图片大小必须相同
     const spriteSheets = {};
-    async function createSpriteSheet(imageBuffers, name) {
+    function createSpriteSheet(imageBuffers, name) {
       const sprite = spriteSheets[name];
-      if (sprite) {
-        if (sprite.status === 'ready') return Promise.resolve(sprite.value);
-        return sprite.promise;
-      }
+      if (sprite) return sprite;
       const promise = new Promise(resolve => {
         Promise.all(imageBuffers.map(buffer => new Promise((resolve, reject) => {
           const img = new Image();
@@ -427,26 +421,43 @@
             return xoff + img.width;
           }, 0);
           canvas.toBlob(blob => {
-            const value = {
+            resolve({
               width: images[0].width,
               height: images[0].height,
               count: images.length,
               url: URL.createObjectURL(blob),
-            };
-            spriteSheets[name] = { status: 'ready', value };
-            resolve(value);
+            });
           }, 'image/bmp');
         });
       });
-      spriteSheets[name] = { status: 'pending', promise };
+      spriteSheets[name] = promise;
       return promise;
     }
 
     // 预加载动画对象
-    async function loadAnimation(event) {
+    function loadAnimation(event) {
       const [basename, extname] = event.filepath.split('.');
       const imageBuffers = Array.from({ length: event.frameCount }, (_, n) => `${basename}${n}.${extname}`);
       return createSpriteSheet(imageBuffers, event.filepath);
+    }
+
+    const imageInfoCache = {};
+    function loadImage(event) {
+      const sprite = imageInfoCache[event.filepath];
+      if (sprite) return sprite;
+      const promise = new Promise(resolve => {
+        const path = event.filepath;
+        getImageObj(path).then(img => {
+          resolve({
+            width: img.width,
+            height: img.height,
+            count: 1,
+            url: getImageFileURL(path),
+          });
+        });
+      });
+      imageInfoCache[event.filepath] = promise;
+      return promise;
     }
 
     function createStoryboardElement(event) {
@@ -456,7 +467,7 @@
       e.sb_img = null;
       e.style.position = 'absolute';
       e.style.zIndex = event.id;
-      e.style.display = 'none';
+      e.style.opacity = '0';
       e.sb_x = null;
       e.sb_y = null;
       e.sb_w = null;
@@ -487,50 +498,48 @@
         case 'BottomRight': origin = '100% 100%'; break;
       }
       e.style.transformOrigin = origin;
-      e.sb_ready = false;
+      e.sb_ready = 0;
       storyboard_elements[event.id] = e;
-      return e;
+      const img = document.createElement('div');
+      e.sb_img = img;
+      e.appendChild(img);
+      return { div: e, img: img };
     }
 
-    function sbDivSetAnimation(div, event, url, count) {
-      div.style.backgroundSize = `${count * 100}% 100%`;
+    function sbSetAnimation(img, event, url, count) {
+      if (count === 1) {
+        img.style.backgroundImage = `url(${url})`;
+      }
+      img.style.backgroundSize = `${count * 100}% 100%`;
       const list = Array.from({ length: count }, (_, n) => `${n / count * 100}% { background-position-x: -${n * 100}%; }`);
       const keyframes = document.createElement('style');
       keyframes.innerHTML = `@keyframes storyboard-${event.id} { ${list.join(' ')} 100% { background-position-x: -${(count - 1) * 100}%; } }`;
-      div.appendChild(keyframes);
+      img.appendChild(keyframes);
       const iteration = event.looptype === 'LoopForever' ? 'infinite' : '1';
-      div.style.animation = `${event.frameDelay * count}ms steps(1) ${iteration} forwards storyboard-${event.id}`;
-      div.style.backgroundImage = `url(${url})`;
+      img.style.animation = `${event.frameDelay * count}ms steps(1) ${iteration} forwards storyboard-${event.id}`;
+      img.style.backgroundImage = `url(${url})`;
     }
 
     function createSpriteImg(event) {
-      const div = createStoryboardElement(event);
-      const img = document.createElement('img');
-      div.sb_img = img;
-      div.appendChild(img);
-      img.src = getImageFileURL(event.filepath);
-      img.onload = function () {
-        img.onload = null;
-        div.sb_rw = img.naturalWidth;
-        div.sb_rh = img.naturalHeight;
-        sbSetPosition(div, event.origin, event.x, event.y, img.naturalWidth, img.naturalHeight);
-        const f = () => { div.style.display = 'block'; div.sb_ready = true; };
-        const time = event.starttime - (Date.now() - playStartTime);
-        if (time > 0) setTimeout(f, time); else f();
-      };
+      const { div, img } = createStoryboardElement(event);
+      loadImage(event).then(({ width, height, count, url }) => {
+        div.sb_rw = width;
+        div.sb_rh = height;
+        sbSetPosition(div, event.origin, event.x, event.y, width, height);
+        sbSetAnimation(img, event, url, count);
+        div.sb_ready = 1;
+      })
       return div;
     }
 
     function createAnimationDiv(event) {
-      const div = createStoryboardElement(event);
+      const { div, img } = createStoryboardElement(event);
       loadAnimation(event).then(({ width, height, count, url }) => {
         div.sb_rw = width;
         div.sb_rh = height;
         sbSetPosition(div, event.origin, event.x, event.y, width, height);
-        sbDivSetAnimation(div, event, url, count);
-        const f = () => { div.style.display = 'block'; div.sb_ready = true; };
-        const time = event.starttime - (Date.now() - playStartTime);
-        if (time > 0) setTimeout(f, time); else f();
+        sbSetAnimation(img, event, url, count);
+        div.sb_ready = 1;
       });
       return div;
     }
@@ -560,6 +569,10 @@
         const element = storyboard_elements[id];
         const event = element.sb_event;
         if (!element.sb_ready) continue;
+        if (element.sb_ready === 1) {
+          element.style.opacity = '1';
+          element.sb_ready = 2;
+        }
         let opacity = null;
         let pos_x = null, pos_y = null;
         let scale_x = null, scale_y = null;
@@ -657,7 +670,7 @@
           }
         }
         if (opacity !== null && opacity !== element.sb_opacity) {
-          element.style.opacity = opacity;
+          element.sb_img.style.opacity = opacity;
           element.sb_opacity = opacity;
         }
         if ((pos_x !== null && pos_x !== element.sb_pos_x) || (pos_y !== null && pos_y !== element.sb_pos_y)) {
