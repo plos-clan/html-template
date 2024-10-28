@@ -39,7 +39,7 @@
       2048 - Hex Edition
     </h1>
     <input type="range" id="boardSize" x-model="newBoardSize" min="4" max="32" step="1" @change="resetGame()"
-      class="w-full sm:w-64" :disabled="isEditMode">
+      class="w-full sm:w-64" :disabled="isEditMode || autoMoveInterval">
     <div class="mb-4 flex flex-col sm:flex-row justify-between items-center">
       <div class="mb-2 sm:mb-0">
         <label for="boardSize" class="mr-2">Size:
@@ -93,7 +93,7 @@
         :disabled="autoMoveInterval || undoStack.length == 0">
         Undo
       </button>
-      <button @click="startAutoMove()" class="text-white font-bold py-1.5 px-3 rounded"
+      <button @click="toggleAutoMove()" class="text-white font-bold py-1.5 px-3 rounded"
         :class="isEditMode ? 'bg-gray-500' : 'bg-blue-500 hover:bg-blue-600'" :disabled="isEditMode">
         Auto
       </button>
@@ -122,7 +122,7 @@
         <li>使用键盘上的箭头键（↑, ↓, ←, →）来移动方块。</li>
         <li>每次移动时，所有方块都会向指定方向滑动。</li>
         <li>当两个相同数字的方块碰撞时，它们会合并成一个新的方块，数字相加。</li>
-        <li>目标是创建一个数字为 2048 的方块。</li>
+        <li>目标是创建一个数字为 0x800 的方块。</li>
       </ol>
       <p class="mb-2">提示：</p>
       <ul class="list-disc list-inside">
@@ -171,6 +171,10 @@
           this.addNewTile();
         },
 
+        showGameOverMessage() {
+          setTimeout(() => { alert('Game Over!') });
+        },
+
         updateEditModeData() {
           this.scoreHex = `0x${this.score.toString(16).toUpperCase()}`;
           this.editBoard = this.board.map(row => row.map(cell => cell ? Math.floor(Math.log2(cell)) : 0));
@@ -180,10 +184,8 @@
           this.isEditMode = !this.isEditMode;
           if (this.isEditMode) {
             this.updateEditModeData();
-          } else {
-            if (this.isGameOver()) {
-              alert('Game Over!');
-            }
+          } else if (this.isGameOver()) {
+            this.showGameOverMessage();
           }
         },
 
@@ -294,7 +296,7 @@
           if (direction === null) return;
 
           if (this.move(direction) && this.isGameOver()) {
-            alert('Game Over!');
+            this.showGameOverMessage();
           }
         },
 
@@ -404,7 +406,7 @@
         },
 
         getCellClass(value) {
-          const baseClasses = 'transition-all duration-100 ease-in-out';
+          const baseClasses = this.autoMoveInterval ? '' : 'transition-all duration-100 ease-in-out';
           if (value === 0) return `${baseClasses} bg-gray-200`;
           const colorClasses = [
             'bg-yellow-200', 'bg-yellow-300', 'bg-yellow-400', 'bg-yellow-500',
@@ -430,33 +432,38 @@
           return `0x${value.toString(16).toUpperCase()}`;
         },
 
-        startAutoMove() {
+        toggleAutoMove() {
           if (this.autoMoveInterval === null) {
-            this.autoMoveInterval = setInterval(() => { this.autoMove() }, 0);
+            this.startAutoMove();
           } else {
-            clearInterval(this.autoMoveInterval);
-            this.autoMoveInterval = null;
+            this.stopAutoMove();
           }
+        },
+
+        startAutoMove() {
+          this.autoMoveInterval = setInterval(() => { this.autoMove() }, 0);
+        },
+
+        stopAutoMove() {
+          clearInterval(this.autoMoveInterval);
+          this.autoMoveInterval = null;
         },
 
         autoMove() {
           const move = getNextMove(this.board);
           if (move === null) {
-            clearInterval(this.autoMoveInterval);
-            this.autoMoveInterval = null;
+            this.stopAutoMove();
+            return;
           }
           if (this.move(move) && this.isGameOver()) {
-            clearInterval(this.autoMoveInterval);
-            this.autoMoveInterval = null;
-            alert('Game Over!');
+            this.stopAutoMove();
+            this.showGameOverMessage();
           }
         },
       };
     }
   </script>
   <script>
-    const stepsCache = {};
-
     function getNextMove(board) {
       const size = board.length;
       const NUM_MAX = 4294967296;
@@ -491,16 +498,17 @@
       }
 
       function mergeRow(row) {
-        const newRow = row.reduce((acc, cell) => {
-          if (cell !== 0) {
-            if (acc.length > 0 && acc[acc.length - 1] === cell && acc[acc.length - 1] * 2 <= NUM_MAX) {
-              acc[acc.length - 1] *= 2;
-            } else {
-              acc.push(cell);
-            }
+        const newRow = [];
+        let i = 0;
+        while (i < row.length - 1) {
+          if (row[i] === 0) { i++; continue; }
+          if (row[i] === row[i + 1] && row[i] * 2 <= NUM_MAX) {
+            newRow.push(row[i] * 2); i += 2;
+          } else {
+            newRow.push(row[i]); i++;
           }
-          return acc;
-        }, []);
+        }
+        if (i < row.length) newRow.push(row[row.length - 1]);
         while (newRow.length < size) {
           newRow.push(0);
         }
