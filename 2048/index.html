@@ -64,14 +64,19 @@
               <span x-html="cell ? getCellText(cell) : ''"></span>
             </template>
             <template x-if="isEditMode">
+              <div class="absolute inset-0" style="background: transparent;"
+                @click.prevent="$el.closest('.flex').querySelector('input').focus()">
+              </div>
+            </template>
+            <template x-if="isEditMode">
               <span>2<sup><input type="text" class="bg-transparent text-center edit-cell" maxlength="2" size="2"
                     style="width: 2ch;" x-model="editBoard[rowIndex][cellIndex]"
-                    @input="editModeInput(rowIndex, cellIndex, $event.target.value)" @focus="$event.target.select()"
-                    :ref="`editCell-${rowIndex}-${cellIndex}`" /></sup></span>
+                    @input="editModeInput(rowIndex, cellIndex, $event.target.value)"
+                    @focus="$nextTick(() => $event.target.select())" /></sup></span>
             </template>
             <template x-if="isEditMode && cell == 0">
               <div class="absolute inset-0 z-10" style="background: transparent;"
-                @mousedown.prevent="board[rowIndex][cellIndex] = 2; editBoard[rowIndex][cellIndex] = 1">
+                @click.prevent="board[rowIndex][cellIndex] = 2; editBoard[rowIndex][cellIndex] = 1; $el.closest('.flex').querySelector('input').focus()">
               </div>
             </template>
           </div>

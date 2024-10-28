@@ -520,21 +520,9 @@
       img.style.backgroundImage = `url(${url})`;
     }
 
-    function createSpriteImg(event) {
+    function createDiv(event) {
       const { div, img } = createStoryboardElement(event);
-      loadImage(event).then(({ width, height, count, url }) => {
-        div.sb_rw = width;
-        div.sb_rh = height;
-        sbSetPosition(div, event.origin, event.x, event.y, width, height);
-        sbSetAnimation(img, event, url, count);
-        div.sb_ready = 1;
-      })
-      return div;
-    }
-
-    function createAnimationDiv(event) {
-      const { div, img } = createStoryboardElement(event);
-      loadAnimation(event).then(({ width, height, count, url }) => {
+      (event.type === 'Sprite' ? loadImage(event) : loadAnimation(event)).then(({ width, height, count, url }) => {
         div.sb_rw = width;
         div.sb_rh = height;
         sbSetPosition(div, event.origin, event.x, event.y, width, height);
@@ -558,7 +546,7 @@
       const time = Date.now() - playStartTime;
       while (queue.start.length && queue.start[0].starttime <= time + 5) {
         const event = queue.start.shift()
-        containers[event.layer]?.appendChild(event.type === 'Sprite' ? createSpriteImg(event) : createAnimationDiv(event));
+        containers[event.layer]?.appendChild(createDiv(event));
       }
       while (queue.stop.length && queue.stop[0].endtime <= time) {
         const event = queue.stop.shift()
