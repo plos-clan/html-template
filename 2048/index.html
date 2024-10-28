@@ -55,7 +55,7 @@
       </template>
     </div>
     <div class="grid gap-2" :style="`grid-template-columns: repeat(${boardSize}, minmax(0, 1fr));`"
-      @touchstart.prevent="handleTouchStart($event)" @touchend.prevent="handleTouchEnd($event)">
+      @touchstart="handleTouchStart($event)" @touchend="handleTouchEnd($event)">
       <template x-for="(row, rowIndex) in board" :key="rowIndex">
         <template x-for="(cell, cellIndex) in row" :key="cellIndex">
           <div class="w-16 h-16 flex items-center justify-center text-xl font-bold rounded-lg"
@@ -226,11 +226,15 @@
         },
 
         handleTouchStart(event) {
+          if (this.isEditMode) return;
+          event.preventDefault();
           this.touchStartX = event.changedTouches[0].screenX;
           this.touchStartY = event.changedTouches[0].screenY;
         },
 
         handleTouchEnd(event) {
+          if (this.isEditMode) return;
+          event.preventDefault();
           this.touchEndX = event.changedTouches[0].screenX;
           this.touchEndY = event.changedTouches[0].screenY;
           this.handleTouchDirection();
