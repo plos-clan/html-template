@@ -200,24 +200,25 @@
               <table class="w-full">
                 <thead>
                   <tr>
-                    <th class="px-4">玩家</th>
-                    <th class="px-4">最大方块</th>
-                    <th class="px-4">得分</th>
-                    <th class="px-4"></th>
+                    <th class="px-0 sm:px-4">玩家</th>
+                    <th class="px-0 sm:px-4">最大方块</th>
+                    <th class="px-0 sm:px-4">得分</th>
+                    <th class="px-0 sm:px-4">盘面</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-200">
-                  <template x-for="(player, index) in leaderboard" :key="index">
+                  <template x-for="(data, index) in leaderboard" :key="index">
                     <tr>
-                      <td class="px-4" x-text="player.username"></td>
-                      <td class="px-4" x-text="`0x${Math.max(...player.board.flat()).toString(16).toUpperCase()}`"></td>
-                      <td class="px-4" x-text="`0x${player.score.toString(16).toUpperCase()}`"></td>
-                      <td class="px-4">
+                      <td class="px-0 sm:px-4" x-text="data.username"></td>
+                      <td class="px-0 sm:px-4"
+                        x-text="`0x${Math.max(...data.board.flat()).toString(16).toUpperCase()}`"></td>
+                      <td class="px-0 sm:px-4" x-text="`0x${data.score.toString(16).toUpperCase()}`"></td>
+                      <td class="px-0 sm:px-4">
                         <button class="ml-2"
                           :class="isEditMode || autoMoveInterval ? 'text-gray-400' : 'text-blue-400 hover:text-blue-600'"
                           @click="loadLeaderboard(index); $nextTick(() => { showSettings = false })"
                           :disabled="isEditMode || autoMoveInterval">
-                          加载盘面
+                          加载
                         </button>
                       </td>
                     </tr>
