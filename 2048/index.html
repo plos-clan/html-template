@@ -992,9 +992,9 @@
         return score;
       }
 
-      function getBestMove(board, depth) {
+      function getBestMove(board, total_depth, depth) {
         if (depth === 0) {
-          return [null, calcScores(board)];
+          return [null, calcScores(board) + total_depth];
         }
 
         let bestMove = null;
@@ -1011,26 +1011,34 @@
               }
             }
           }
-          const scores = [];
-          for (const { i, j } of emptyCells) {
+          let finalScore;
+          if (depth === total_depth) {
+            const scores = [];
+            for (const { i, j } of emptyCells) {
+              let board = newBoard.map(row => row.slice());
+              board[i][j] = 2;
+              const [_, score] = getBestMove(board, total_depth, depth - 1);
+              scores.push(score);
+            }
+            finalScore = Math.min(...scores) + scores.reduce((a, b) => a + b, 0) / scores.length;
+          } else {
             let board = newBoard.map(row => row.slice());
+            const { i, j } = emptyCells[Math.floor(Math.random() * emptyCells.length)];
             board[i][j] = 2;
-            const [_, score] = getBestMove(board, depth - 1);
-            scores.push(score);
+            const [_, score] = getBestMove(board, total_depth, depth - 1);
+            finalScore = score;
           }
-          const finalScore = Math.min(...scores) + scores.reduce((a, b) => a + b, 0) / scores.length;
           if (finalScore > maxScore) {
             maxScore = finalScore;
             bestMove = direction;
           }
         }
 
-        return [bestMove, bestMove ? maxScore : calcScores(board)];
+        return [bestMove, bestMove ? maxScore : calcScores(board) + total_depth - depth];
       }
 
-
       if (size === 4) {
-        const [bestMove] = getBestMove(board, 3);
+        const [bestMove] = getBestMove(board, 5, 5);
         return bestMove || null;
       }
 
