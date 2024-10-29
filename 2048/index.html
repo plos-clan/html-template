@@ -63,7 +63,7 @@
         class="w-full sm:w-64" :disabled="isEditMode || autoMoveInterval">
     </template>
     <div class="mb-4 flex flex-wrap justify-between items-center">
-      <template x-if="showBoardSize || boardSize !== newBoardSize">
+      <template x-if="showBoardSize || boardSize !== parseInt(newBoardSize)">
         <div class="mb-2">
           <label for="boardSize" class="mr-2">Size:
             <span x-text="`0x${parseInt(newBoardSize).toString(16).toUpperCase()}`"></span>
@@ -390,7 +390,7 @@
         resetGame(boardSize = null) {
           this.updateHistory();
           this.newGame = true;
-          this.boardSize = boardSize || this.newBoardSize;
+          this.boardSize = boardSize || parseInt(this.newBoardSize);
           this.board = Array(Number(this.boardSize)).fill().map(() => Array(Number(this.boardSize)).fill(0));
           this.score = 0;
           this.addNewTile();
@@ -408,6 +408,7 @@
             this.board = board;
             this.score = score;
             this.boardSize = boardSize;
+            this.newBoardSize = `${boardSize}`;
             if (import_history && history !== undefined) {
               this.undoStack = history.undo;
               this.redoStack = history.redo;
