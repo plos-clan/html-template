@@ -30,26 +30,51 @@
       color: darkcyan;
       background: #ffcc00;
     }
+
+    textarea {
+      outline: none;
+    }
+
+    textarea.serialization {
+      width: 100%;
+      height: 10em;
+      font-size: medium;
+      resize: none !important;
+    }
+
+    textarea.serialization:focus {
+      color: darkcyan;
+    }
+
+    textarea.serialization::selection {
+      color: darkcyan;
+      background: #ffcc00;
+    }
   </style>
 </head>
 
 <body x-data="game()" x-init="initGame()" class="bg-gray-100 min-h-screen flex items-center justify-center">
   <div class="p-4 bg-white rounded-lg shadow-lg" @keydown.window="handleKeyPress($event)">
-    <h1 class="text-3xl font-bold text-center mb-4" @click="$nextTick(() => { showSettings = !showSettings })">
+    <h1 class="text-3xl font-bold text-center mb-4" @click="$nextTick(() => { showSettings = true })">
       2048 - Hex Edition
     </h1>
-    <input type="range" id="boardSize" x-model="newBoardSize" min="4" max="32" step="1" @change="resetGame()"
-      class="w-full sm:w-64" :disabled="isEditMode || autoMoveInterval">
+    <template x-if="showBoardSizeSlider">
+      <input type="range" id="boardSize" x-model="newBoardSize" min="4" max="32" step="1" @change="resetGame()"
+        class="w-full sm:w-64" :disabled="isEditMode || autoMoveInterval">
+    </template>
     <div class="mb-4 flex flex-col sm:flex-row justify-between items-center">
-      <div class="mb-2 sm:mb-0">
-        <label for="boardSize" class="mr-2">Size:
-          <span x-text="`0x${parseInt(newBoardSize).toString(16).toUpperCase()}`"></span>
-        </label>
-      </div>
-      <template x-if="!isEditMode">
+      <template x-if="showBoardSize || boardSize !== newBoardSize">
+        <div class="mb-2 sm:mb-0">
+          <label for="boardSize" class="mr-2">Size:
+            <span x-text="`0x${parseInt(newBoardSize).toString(16).toUpperCase()}`"></span>
+          </label>
+        </div>
+      </template>
+      <div></div>
+      <template x-if="showScore && !isEditMode">
         <div class="text-xl font-bold">Score: <span x-text="`0x${score.toString(16).toUpperCase()}`"></span></div>
       </template>
-      <template x-if="isEditMode">
+      <template x-if="showScore && isEditMode">
         <div class="text-xl font-bold">Score: <input type="text" class="bg-transparent text-center edit-cell"
             maxlength="11" size="11" style="width: 11ch;" x-model="scoreHex"
             @input="editModeScoreInput($event.target.value)" @focus="$event.target.select()" /></div>
@@ -88,11 +113,13 @@
       </template>
     </div>
     <div class="mt-4 text-center">
-      <button @click="undo()" class="text-white font-bold py-1.5 px-3 rounded"
-        :class="autoMoveInterval || undoStack.length == 0 ? 'bg-gray-500' : 'bg-blue-500 hover:bg-blue-600'"
-        :disabled="autoMoveInterval || undoStack.length == 0">
-        Undo
-      </button>
+      <template x-if="showUndoRedo">
+        <button @click="undo()" class="text-white font-bold py-1.5 px-3 rounded"
+          :class="autoMoveInterval || undoStack.length == 0 ? 'bg-gray-500' : 'bg-blue-500 hover:bg-blue-600'"
+          :disabled="autoMoveInterval || undoStack.length == 0">
+          Undo
+        </button>
+      </template>
       <button @click="toggleAutoMove()" class="text-white font-bold py-1.5 px-3 rounded"
         :class="isEditMode ? 'bg-gray-500' : 'bg-blue-500 hover:bg-blue-600'" :disabled="isEditMode">
         Auto
@@ -105,17 +132,19 @@
         :class="autoMoveInterval ? 'bg-gray-500' : 'bg-blue-500 hover:bg-blue-600'" :disabled="autoMoveInterval">
         Edit
       </button>
-      <button @click="redo()" class="text-white font-bold py-1.5 px-3 rounded"
-        :class="autoMoveInterval || redoStack.length == 0 ? 'bg-gray-500' : 'bg-blue-500 hover:bg-blue-600'"
-        :disabled="autoMoveInterval || redoStack.length == 0">
-        Redo
-      </button>
+      <template x-if="showUndoRedo">
+        <button @click="redo()" class="text-white font-bold py-1.5 px-3 rounded"
+          :class="autoMoveInterval || redoStack.length == 0 ? 'bg-gray-500' : 'bg-blue-500 hover:bg-blue-600'"
+          :disabled="autoMoveInterval || redoStack.length == 0">
+          Redo
+        </button>
+      </template>
     </div>
   </div>
   <div
     class="absolute inset-0 z-10 bg-black bg-opacity-30 opacity-0 flex items-center justify-center transition-all duration-300 ease-in-out"
     :style="`opacity: ${ showSettings ? '1' : '0' }; ${ showSettings ? '' : 'pointer-events: none;' } backdrop-filter: blur(2px);`">
-    <div class="bg-white rounded-lg shadow-lg text-lg" @click.away="showSettings = false">
+    <div class="bg-white rounded-lg shadow-lg text-lg" @click.away="if (!showSerialization) showSettings = false">
       <div class="mb-4 border-b border-gray-200">
         <ul class="flex flex-wrap -mb-px text-sm font-medium text-center">
           <template x-for="tab in ['教程', '设置']" :key="tab">
@@ -155,16 +184,93 @@
           </div>
         </template>
         <template x-if="activeTab === '设置'">
-          <div style="position: relative;">
+          <div class="flex items-center justify-center" style="position: relative;">
             <template x-if="isEditMode || autoMoveInterval">
               <div class="absolute inset-0 z-10 flex items-center justify-center" style="backdrop-filter: blur(1px);">
-                <div class="p-2 bg-gray-300 bg-opacity-30 rounded-lg" style="color: gold;">请先关闭编辑模式与自动模式</div>
+                <div class="p-2 bg-gray-300 bg-opacity-75 rounded-xl text-white font-bold"
+                  x-text="isEditMode ? '请先关闭编辑模式' : '请先关闭自动模式'"></div>
               </div>
             </template>
-            --------------------------------------------------<br>暂无设置<br>占位符<br>占位符<br>占位符
+            <div class="mr-4">
+              <label class="flex items-center mb-2">
+                <input type="checkbox" class="mr-2" x-model="showScore" @change="saveSettings()">
+                显示分数
+              </label>
+              <label class="flex items-center mb-2">
+                <input type="checkbox" class="mr-2" x-model="showBoardSize" @change="saveSettings()">
+                显示盘面大小
+              </label>
+              <label class="flex items-center mb-2">
+                <input type="checkbox" class="mr-2" x-model="showBoardSizeSlider" @change="saveSettings()">
+                显示盘面大小调整滑条
+              </label>
+              <label class="flex items-center mb-2">
+                <input type="checkbox" class="mr-2" x-model="showUndoRedo" @change="saveSettings()">
+                显示撤销、重做按钮
+              </label>
+            </div>
+            <div class="ml-4">
+              <button class="block text-white m-2 py-1.5 px-3 rounded bg-blue-500 hover:bg-blue-600"
+                @click="$nextTick(() => { showSerialization = true; serializationMode = 'output' })">
+                导出盘面
+              </button>
+              <button class="block text-white m-2 py-1.5 px-3 rounded bg-blue-500 hover:bg-blue-600"
+                @click="$nextTick(() => { showSerialization = true; serializationMode = 'input' })">
+                导入盘面
+              </button>
+            </div>
           </div>
         </template>
       </div>
+    </div>
+  </div>
+  <div
+    class="absolute inset-0 z-20 bg-black bg-opacity-30 opacity-0 flex items-center justify-center transition-all duration-300 ease-in-out"
+    :style="`opacity: ${ showSerialization ? '1' : '0' }; ${ showSerialization ? '' : 'pointer-events: none;' } backdrop-filter: blur(1px);`">
+    <div class="bg-white rounded-lg shadow-lg p-4 text-lg" @click.away="showSerialization = false">
+      <div class="mb-4 flex flex-col sm:flex-row justify-between items-center">
+        <h2 class="text-xl font-bold">盘面序列化</h2>
+        <button class="inline-block p-2 rounded-t-lg border-transparent text-sm text-gray-500 hover:text-red-500"
+          @click="$nextTick(() => { showSerialization = false })" type="button" role="tab">
+          关闭
+        </button>
+      </div>
+      <template x-if="serializationMode === 'output'">
+        <div class="serialization">
+          <p class="mb-4">将以下文本复制到剪贴板，以保存当前盘面状态：</p>
+          <textarea class="serialization p-2 bg-gray-100 rounded-lg" x-text="exportBoard($el)" readonly
+            @focus="$nextTick(() => $event.target.select())"></textarea>
+          <div class="mt-4 text-right">
+            <span style="color: green; display: none;">复制成功</span>
+            <button class="text-white font-bold py-1.5 px-3 rounded bg-blue-500 hover:bg-blue-600" @click="
+              navigator.clipboard.writeText($el.closest('div.serialization').querySelector('textarea').value);
+              $el.closest('div').querySelector('span').style.display = 'inline';
+              if ($el.x_timeout) clearTimeout($el.x_timeout);
+              $el.x_timeout = setTimeout(() => { $el.closest('div').querySelector('span').style.display = 'none' }, 2000);
+              ">
+              复制
+            </button>
+          </div>
+        </div>
+      </template>
+      <template x-if="serializationMode === 'input'">
+        <div class="serialization">
+          <p class="mb-4">将保存的盘面状态文本粘贴到下方输入框，然后点击“导入”按钮：</p>
+          <textarea class="serialization p-2 bg-gray-100 rounded-lg"
+            @focus="$nextTick(() => $event.target.select())"></textarea>
+          <div class=" mt-4 text-right">
+            <button class="text-white font-bold py-1.5 px-3 rounded bg-blue-500 hover:bg-blue-600" @click="
+              const textarea = $el.closest('div.serialization').querySelector('textarea');
+              if (importBoard(textarea.value)) {
+                textarea.value = '';
+                $nextTick(() => { showSerialization = false });
+              }
+              ">
+              导入
+            </button>
+          </div>
+        </div>
+      </template>
     </div>
   </div>
 
@@ -173,6 +279,12 @@
       return {
         showSettings: false,
         activeTab: '教程',
+        showScore: true,
+        showBoardSize: true,
+        showBoardSizeSlider: true,
+        showUndoRedo: true,
+        showSerialization: false,
+        serializationMode: 'output',
         newGame: true,
         board: [],
         boardSize: 4,
@@ -191,19 +303,56 @@
         redoStack: [],
         autoMoveInterval: null,
 
+        saveSettings() {
+          localStorage.setItem('settings', JSON.stringify({
+            showScore: this.showScore,
+            showBoardSize: this.showBoardSize,
+            showBoardSizeSlider: this.showBoardSizeSlider,
+            showUndoRedo: this.showUndoRedo,
+          }));
+        },
+
         initGame() {
+          const settings = JSON.parse(localStorage.getItem('settings'));
+          if (settings) {
+            this.showScore = settings.showScore;
+            this.showBoardSize = settings.showBoardSize;
+            this.showBoardSizeSlider = settings.showBoardSizeSlider;
+            this.showUndoRedo = settings.showUndoRedo;
+          }
           this.resetGame();
           this.undoStack = [];
         },
 
-        resetGame() {
+        resetGame(boardSize = null) {
           this.updateHistory();
           this.newGame = true;
-          this.boardSize = this.newBoardSize;
+          this.boardSize = boardSize || this.newBoardSize;
           this.board = Array(Number(this.boardSize)).fill().map(() => Array(Number(this.boardSize)).fill(0));
           this.score = 0;
           this.addNewTile();
           this.addNewTile();
+        },
+
+        importBoard(serialized) {
+          try {
+            const { board, score, boardSize } = JSON.parse(serialized);
+            if (board.length !== boardSize || board.some(row => row.length !== boardSize)) {
+              throw new Error('Invalid board size');
+            }
+            this.updateHistory();
+            this.board = board;
+            this.score = score;
+            this.boardSize = boardSize;
+            return true;
+          } catch (error) {
+            setTimeout(() => { alert('Invalid board data') }, 0);
+            return false;
+          }
+        },
+
+        exportBoard() {
+          return JSON.stringify({ board: this.board, score: this.score, boardSize: this.boardSize });
         },
 
         showGameOverMessage() {
