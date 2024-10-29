@@ -1,20 +1,41 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-cn">
 
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>plos-clan html-template</title>
+  <script src="2048/tailwindcss.js"></script>
+  <script defer src="2048/alpinejs.js"></script>
 </head>
 
-<body>
-  <h1>plos-clan 的网页模板</h1>
-  <div>
-    <img src="/background/ripple/screenshot.png">
-    <p><a href="/background/ripple/">水纹效果</a></p>
-    <p><a href="/2048/">2048 游戏</a></p>
-    <p><a href="/osb-player/">OSU! 故事板播放器</a></p>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center justify-center">
+  <div class="m-4 p-4 bg-white rounded-lg shadow-lg">
+    <h1 class="text-3xl font-bold text-center">plos-clan 的网页模板</h1>
   </div>
+  <div x-data="main()" class="flex flex-wrap justify-center m-auto ">
+    <template x-for="(data, path) in projects">
+      <div class="w-1/4 m-4 p-4 bg-white rounded-lg shadow-lg cursor-pointer" @click="window.location.href=`${path}/`">
+        <h2 class="text-xl text-center mb-4" x-text="data[0]"></h2>
+        <img alt="screenshot" :src="`${path}/screenshot.png`">
+        <template x-if="data[1]">
+          <p class="mt-2" x-text="data[1]"></p>
+        </template>
+      </div>
+    </template>
+  </div>
+
+  <script>
+    function main() {
+      return {
+        projects: {
+          'background/ripple': ['水纹效果', '一个简单的水纹效果'],
+          '2048': ['2048 游戏', '一个简单的 2048 游戏'],
+          'osb-player': ['OSU! 故事板播放器', '一个简单的 OSU! 故事板播放器'],
+        },
+      };
+    }
+  </script>
 </body>
 
 </html>
