@@ -312,6 +312,10 @@
           }));
         },
 
+        saveBoard() {
+          localStorage.setItem('board', this.exportBoard());
+        },
+
         initGame() {
           const settings = JSON.parse(localStorage.getItem('settings'));
           if (settings) {
@@ -320,7 +324,12 @@
             this.showBoardSizeSlider = settings.showBoardSizeSlider;
             this.showUndoRedo = settings.showUndoRedo;
           }
-          this.resetGame();
+          const board = localStorage.getItem('board');
+          if (board) {
+            this.importBoard(board);
+          } else {
+            this.resetGame();
+          }
           this.undoStack = [];
         },
 
@@ -344,6 +353,7 @@
             this.board = board;
             this.score = score;
             this.boardSize = boardSize;
+            this.saveBoard();
             return true;
           } catch (error) {
             setTimeout(() => { alert('Invalid board data') }, 0);
@@ -356,6 +366,7 @@
         },
 
         showGameOverMessage() {
+          this.saveBoard();
           setTimeout(() => { alert('Game Over!') });
         },
 
@@ -439,6 +450,9 @@
           if (emptyCells.length > 0) {
             const { i, j } = emptyCells[Math.floor(Math.random() * emptyCells.length)];
             this.board[i][j] = Math.random() < 0.9 ? 2 : 4;
+          }
+          if (!this.autoMoveInterval) {
+            this.saveBoard();
           }
         },
 
@@ -631,6 +645,7 @@
         stopAutoMove() {
           clearInterval(this.autoMoveInterval);
           this.autoMoveInterval = null;
+          this.saveBoard();
         },
 
         autoMove() {
