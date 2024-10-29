@@ -185,7 +185,7 @@
           </div>
         </template>
         <template x-if="activeTab === '设置'">
-          <div class="flex items-center justify-center" style="position: relative;">
+          <div class="flex items-top justify-center" style="position: relative;">
             <template x-if="isEditMode || autoMoveInterval">
               <div class="absolute inset-0 z-10 flex items-center justify-center" style="backdrop-filter: blur(1px);">
                 <div class="p-2 bg-gray-300 bg-opacity-75 rounded-xl text-white font-bold"
@@ -208,6 +208,10 @@
               <label class="flex items-center mb-2">
                 <input type="checkbox" class="mr-2" x-model="showUndoRedo" @change="saveSettings()">
                 显示撤销、重做按钮
+              </label>
+              <label class="flex items-center mb-2">
+                <input type="checkbox" class="mr-2" x-model="hiddenMode" @change="saveSettings()">
+                隐藏大于 4 的块
               </label>
             </div>
             <div class="ml-4">
@@ -239,7 +243,12 @@
       <template x-if="serializationMode === 'output'">
         <div class="serialization">
           <p class="mb-4">将以下文本复制到剪贴板，以保存当前盘面状态：</p>
-          <textarea class="serialization p-2 bg-gray-100 rounded-lg" x-text="exportBoard($el)" readonly
+          <label class="flex items-center">
+            <input type="checkbox" class="mr-2" x-model="exportHistory"
+              @change="$el.closest('div.serialization').querySelector('textarea').value = exportBoard()">
+            导出历史记录
+          </label>
+          <textarea class="serialization p-2 bg-gray-100 rounded-lg break-words" x-text="exportBoard()" readonly
             @focus="$nextTick(() => $event.target.select())"></textarea>
           <div class="mt-4 text-right">
             <span style="color: green; display: none;">复制成功</span>
@@ -257,7 +266,11 @@
       <template x-if="serializationMode === 'input'">
         <div class="serialization">
           <p class="mb-4">将保存的盘面状态文本粘贴到下方输入框，然后点击“导入”按钮：</p>
-          <textarea class="serialization p-2 bg-gray-100 rounded-lg"
+          <label class="flex items-center">
+            <input type="checkbox" class="mr-2" x-model="importHistory">
+            导入历史记录
+          </label>
+          <textarea class="serialization p-2 bg-gray-100 rounded-lg break-words"
             @focus="$nextTick(() => $event.target.select())"></textarea>
           <div class=" mt-4 text-right">
             <button class="text-white font-bold py-1.5 px-3 rounded bg-blue-500 hover:bg-blue-600" @click="
@@ -321,6 +334,9 @@
         showUndoRedo: true,
         showSerialization: false,
         serializationMode: 'output',
+        exportHistory: false,
+        importHistory: false,
+        hiddenMode: false,
         newGame: true,
         board: [],
         boardSize: 4,
@@ -345,11 +361,12 @@
             showBoardSize: this.showBoardSize,
             showBoardSizeSlider: this.showBoardSizeSlider,
             showUndoRedo: this.showUndoRedo,
+            hiddenMode: this.hiddenMode,
           }));
         },
 
         saveBoard() {
-          localStorage.setItem('board', this.exportBoard());
+          localStorage.setItem('board', this.exportBoard(false));
         },
 
         initGame() {
@@ -359,10 +376,11 @@
             this.showBoardSize = settings.showBoardSize;
             this.showBoardSizeSlider = settings.showBoardSizeSlider;
             this.showUndoRedo = settings.showUndoRedo;
+            this.hiddenMode = settings.hiddenMode;
           }
           const board = localStorage.getItem('board');
           if (board) {
-            this.importBoard(board);
+            this.importBoard(board, false);
           } else {
             this.resetGame();
           }
@@ -379,16 +397,21 @@
           this.addNewTile();
         },
 
-        importBoard(serialized) {
+        importBoard(serialized, import_history = null) {
+          import_history = import_history !== null ? import_history : this.importHistory;
           try {
-            const { board, score, boardSize } = JSON.parse(serialized);
+            const { board, score, boardSize, history } = JSON.parse(serialized);
             if (board.length !== boardSize || board.some(row => row.length !== boardSize)) {
               throw new Error('Invalid board size');
             }
-            this.updateHistory();
+            if (!import_history || history === undefined) this.updateHistory();
             this.board = board;
             this.score = score;
             this.boardSize = boardSize;
+            if (import_history && history !== undefined) {
+              this.undoStack = history.undo;
+              this.redoStack = history.redo;
+            }
             this.saveBoard();
             return true;
           } catch (error) {
@@ -397,8 +420,15 @@
           }
         },
 
-        exportBoard() {
-          return JSON.stringify({ board: this.board, score: this.score, boardSize: this.boardSize });
+        exportBoard(export_history = null) {
+          export_history = export_history !== null ? export_history : this.exportHistory;
+          const data = {
+            board: this.board,
+            score: this.score,
+            boardSize: this.boardSize,
+          };
+          if (export_history) data.history = { undo: this.undoStack, redo: this.redoStack };
+          return JSON.stringify(data);
         },
 
         showGameOverMessage() {
@@ -642,6 +672,7 @@
         getCellClass(value) {
           const baseClasses = this.autoMoveInterval ? '' : 'transition-all duration-100 ease-in-out';
           if (value === 0) return `${baseClasses} bg-gray-200`;
+          if (!this.isEditMode && this.hiddenMode && value > 4) return `${baseClasses} bg-gray-400`;
           const colorClasses = [
             'bg-yellow-200', 'bg-yellow-300', 'bg-yellow-400', 'bg-yellow-500',
             'bg-orange-200', 'bg-orange-300', 'bg-orange-400', 'bg-orange-500',
@@ -655,13 +686,14 @@
 
         getCellStyle(value) {
           if (value === 0) return `font-size: 0px;`;
-          if (this.isEditMode) return 'font-size: 20px;';
+          if (this.isEditMode || this.hiddenMode) return 'font-size: 20px;';
           if (value >= 0x10000) return 'font-size: 20px;';
           const fontSize = 60 / (Math.floor(Math.log2(value) / 4) + 3);
           return `font-size: ${fontSize}px;`;
         },
 
         getCellText(value) {
+          if (this.hiddenMode && value > 4) return 'X';
           if (value >= 0x10000) return `2<sup>${Math.floor(Math.log2(value))}</sup>`;
           return `0x${value.toString(16).toUpperCase()}`;
         },
