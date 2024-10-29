@@ -198,7 +198,7 @@
             </template>
             <template x-if="leaderboard.length !== 0">
               <ol class="list-decimal list-inside mb-4">
-                <template x-for="(player, index) in leaderboard" :key="player.username">
+                <template x-for="(player, index) in leaderboard" :key="index">
                   <li class="flex justify-between items-center">
                     <span x-text="player.username"></span>
                     <span x-text="`0x${player.score.toString(16).toUpperCase()}`"></span>
