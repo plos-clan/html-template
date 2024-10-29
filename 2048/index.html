@@ -187,30 +187,43 @@
         <template x-if="activeTab === '排行'">
           <div>
             <div class="mb-4 flex flex-wrap justify-between items-center">
-              <h2 class="text-xl font-bold">最高分的玩家</h2>
+              <h2 class="text-xl font-bold">2048 排行榜</h2>
               <button class="ml-2 text-blue-400 hover:text-blue-600" @click="downloadLeaderboard()">
                 刷新
               </button>
             </div>
             <div style="width: 300px;"></div>
-            <template x-if="leaderboard.length === 0 || console.log(leaderboard)">
+            <template x-if="leaderboard.length === 0">
               <p>暂无数据</p>
             </template>
             <template x-if="leaderboard.length !== 0">
-              <ol class="list-decimal list-inside mb-4">
-                <template x-for="(player, index) in leaderboard" :key="index">
-                  <li class="flex justify-between items-center">
-                    <span x-text="player.username"></span>
-                    <span x-text="`0x${player.score.toString(16).toUpperCase()}`"></span>
-                    <button class="ml-2"
-                      :class="isEditMode || autoMoveInterval ? 'text-gray-400' : 'text-blue-400 hover:text-blue-600'"
-                      @click="loadLeaderboard(index); $nextTick(() => { showSettings = false })"
-                      :disabled="isEditMode || autoMoveInterval">
-                      加载盘面
-                    </button>
-                  </li>
-                </template>
-              </ol>
+              <table class="w-full">
+                <thead>
+                  <tr>
+                    <th class="px-4">玩家</th>
+                    <th class="px-4">最大方块</th>
+                    <th class="px-4">得分</th>
+                    <th class="px-4"></th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                  <template x-for="(player, index) in leaderboard" :key="index">
+                    <tr>
+                      <td class="px-4" x-text="player.username"></td>
+                      <td class="px-4" x-text="`0x${Math.max(...player.board.flat()).toString(16).toUpperCase()}`"></td>
+                      <td class="px-4" x-text="`0x${player.score.toString(16).toUpperCase()}`"></td>
+                      <td class="px-4">
+                        <button class="ml-2"
+                          :class="isEditMode || autoMoveInterval ? 'text-gray-400' : 'text-blue-400 hover:text-blue-600'"
+                          @click="loadLeaderboard(index); $nextTick(() => { showSettings = false })"
+                          :disabled="isEditMode || autoMoveInterval">
+                          加载盘面
+                        </button>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
             </template>
           </div>
         </template>
@@ -460,7 +473,7 @@
 
         resetGame(boardSize = null) {
           boardSize = boardSize !== null ? boardSize : parseInt(this.newBoardSize);
-          if (this.boardSize != boardSize) this.downloadLeaderboard();
+          const size_changed = this.boardSize != boardSize;
           this.updateHistory();
           this.newGame = true;
           this.boardSize = boardSize;
@@ -468,6 +481,7 @@
           this.score = 0;
           this.addNewTile();
           this.addNewTile();
+          if (size_changed) this.downloadLeaderboard();
         },
 
         importBoard(serialized, import_history = null) {
@@ -487,6 +501,7 @@
               this.redoStack = history.redo;
             }
             this.saveBoard();
+            this.newGame = true;
             return true;
           } catch (error) {
             setTimeout(() => { alert('Invalid board data') }, 0);
@@ -525,16 +540,18 @@
         },
 
         editModeSetVal(row, col, value) {
-          this.editBoard[row][col] = value;
-          this.board[row][col] = value ? Math.pow(2, value) : 0;
+          if (value !== this.editBoard[row][col]) {
+            this.updateHistory();
+            this.editBoard[row][col] = value;
+            this.board[row][col] = value ? Math.pow(2, value) : 0;
+          }
         },
 
         editModeInput(row, col, value) {
           value = value.replace(/[^0-9]/g, '');
           value = value ? parseInt(value) : 0;
           value = Math.min(value, Math.floor(Math.log2(this.NUM_MAX)));
-          this.editBoard[row][col] = value;
-          this.board = this.editBoard.map(row => row.map(cell => cell ? Math.pow(2, cell) : 0));
+          this.editModeSetVal(row, col, value);
         },
 
         editModeScoreInput(value) {
