@@ -53,96 +53,98 @@
   </style>
 </head>
 
-<body x-data="game()" x-init="initGame()" class="bg-gray-100 min-h-screen flex items-center justify-center">
-  <div class="p-4 bg-white rounded-lg shadow-lg" @keydown.window="handleKeyPress($event)">
-    <h1 class="text-3xl font-bold text-center mb-4" @click="$nextTick(() => { showSettings = true })">
-      2048 - Hex Edition
-    </h1>
-    <template x-if="showBoardSizeSlider">
-      <input type="range" id="boardSize" x-model="newBoardSize" min="4" max="32" step="1" @change="resetGame()"
-        class="w-full sm:w-64" :disabled="isEditMode || autoMoveInterval">
-    </template>
-    <div class="mb-4 flex flex-wrap justify-between items-center">
-      <template x-if="showBoardSize || boardSize !== parseInt(newBoardSize)">
-        <div class="mb-2">
-          <label for="boardSize" class="mr-2">Size:
-            <span x-text="`0x${parseInt(newBoardSize).toString(16).toUpperCase()}`"></span>
-          </label>
-        </div>
+<body x-data="game()" x-init="initGame()" class="bg-gray-100 h-screen overflow-hidden">
+  <div class="absolute inset-0 overflow-y-auto flex flex-wrap items-center justify-center">
+    <div class="p-4 bg-white rounded-lg shadow-lg" @keydown.window="handleKeyPress($event)">
+      <h1 class="text-3xl font-bold text-center mb-4" @click="$nextTick(() => { showSettings = true })">
+        2048 - Hex Edition
+      </h1>
+      <template x-if="showBoardSizeSlider">
+        <input type="range" id="boardSize" x-model="newBoardSize" min="4" max="32" step="1" @change="resetGame()"
+          class="w-full sm:w-64" :disabled="isEditMode || autoMoveInterval">
       </template>
-      <div></div>
-      <template x-if="showScore && !isEditMode">
-        <div class="text-xl font-bold">Score: <span x-text="`0x${score.toString(16).toUpperCase()}`"></span></div>
-      </template>
-      <template x-if="showScore && isEditMode">
-        <div class="text-xl font-bold">Score: <input type="text" class="bg-transparent text-center edit-cell"
-            maxlength="11" size="11" style="width: 11ch;" x-model="scoreHex"
-            @input="editModeScoreInput($event.target.value)" @focus="$event.target.select()" /></div>
-      </template>
-    </div>
-    <div class="grid gap-2" :style="`grid-template-columns: repeat(${boardSize}, minmax(0, 1fr));`"
-      @touchstart="handleTouchStart($event)" @touchend="handleTouchEnd($event)">
-      <template x-for="(row, rowIndex) in board" :key="rowIndex">
-        <template x-for="(cell, cellIndex) in row" :key="cellIndex">
-          <div class="w-16 h-16 flex items-center justify-center text-xl font-bold rounded-lg"
-            :class="getCellClass(cell)" :style="getCellStyle(cell) + 'position: relative;'">
-            <template x-if="!isEditMode">
-              <span x-html="cell ? getCellText(cell) : ''"></span>
-            </template>
-            <template x-if="isEditMode">
-              <div class="absolute inset-0" style="background: transparent;"
-                @click.prevent="$el.closest('.flex').querySelector('input').focus()"
-                @contextmenu.prevent="editModeSetVal(rowIndex, cellIndex, 0); $el.closest('.flex').querySelector('input').blur()">
-              </div>
-            </template>
-            <template x-if="isEditMode">
-              <span>2<sup><input type="text" class="bg-transparent text-center edit-cell" maxlength="2" size="2"
-                    style="width: 2ch;" x-model="editBoard[rowIndex][cellIndex]"
-                    @contextmenu.prevent="editModeSetVal(rowIndex, cellIndex, 0); $el.blur()"
-                    @input="editModeInput(rowIndex, cellIndex, $event.target.value)"
-                    @focus="$nextTick(() => $event.target.select())" /></sup></span>
-            </template>
-            <template x-if="isEditMode && cell == 0">
-              <div class="absolute inset-0 z-10" style="background: transparent;"
-                @click.prevent="editModeSetVal(rowIndex, cellIndex, 1); $el.closest('.flex').querySelector('input').focus()"
-                @contextmenu.prevent="">
-              </div>
-            </template>
+      <div class="mb-4 flex flex-wrap justify-between items-center">
+        <template x-if="showBoardSize || boardSize !== parseInt(newBoardSize)">
+          <div class="mb-2">
+            <label for="boardSize" class="mr-2">Size:
+              <span x-text="`0x${parseInt(newBoardSize).toString(16).toUpperCase()}`"></span>
+            </label>
           </div>
         </template>
-      </template>
-    </div>
-    <div class="mt-4 text-center">
-      <template x-if="showUndoRedo">
-        <button @click="undo()" class="text-white font-bold py-1.5 px-3 rounded"
-          :class="autoMoveInterval || undoStack.length == 0 ? 'bg-gray-500' : 'bg-blue-500 hover:bg-blue-600'"
-          :disabled="autoMoveInterval || undoStack.length == 0">
-          Undo
+        <div></div>
+        <template x-if="showScore && !isEditMode">
+          <div class="text-xl font-bold">Score: <span x-text="`0x${score.toString(16).toUpperCase()}`"></span></div>
+        </template>
+        <template x-if="showScore && isEditMode">
+          <div class="text-xl font-bold">Score: <input type="text" class="bg-transparent text-center edit-cell"
+              maxlength="11" size="11" style="width: 11ch;" x-model="scoreHex"
+              @input="editModeScoreInput($event.target.value)" @focus="$event.target.select()" /></div>
+        </template>
+      </div>
+      <div class="grid gap-2" :style="`grid-template-columns: repeat(${boardSize}, minmax(0, 1fr));`"
+        @touchstart="handleTouchStart($event)" @touchend="handleTouchEnd($event)">
+        <template x-for="(row, rowIndex) in board" :key="rowIndex">
+          <template x-for="(cell, cellIndex) in row" :key="cellIndex">
+            <div class="w-16 h-16 flex items-center justify-center text-xl font-bold rounded-lg"
+              :class="getCellClass(cell)" :style="getCellStyle(cell) + 'position: relative;'">
+              <template x-if="!isEditMode">
+                <span x-html="cell ? getCellText(cell) : ''"></span>
+              </template>
+              <template x-if="isEditMode">
+                <div class="absolute inset-0" style="background: transparent;"
+                  @click.prevent="$el.closest('.flex').querySelector('input').focus()"
+                  @contextmenu.prevent="editModeSetVal(rowIndex, cellIndex, 0); $el.closest('.flex').querySelector('input').blur()">
+                </div>
+              </template>
+              <template x-if="isEditMode">
+                <span>2<sup><input type="text" class="bg-transparent text-center edit-cell" maxlength="2" size="2"
+                      style="width: 2ch;" x-model="editBoard[rowIndex][cellIndex]"
+                      @contextmenu.prevent="editModeSetVal(rowIndex, cellIndex, 0); $el.blur()"
+                      @input="editModeInput(rowIndex, cellIndex, $event.target.value)"
+                      @focus="$nextTick(() => $event.target.select())" /></sup></span>
+              </template>
+              <template x-if="isEditMode && cell == 0">
+                <div class="absolute inset-0 z-10" style="background: transparent;"
+                  @click.prevent="editModeSetVal(rowIndex, cellIndex, 1); $el.closest('.flex').querySelector('input').focus()"
+                  @contextmenu.prevent="">
+                </div>
+              </template>
+            </div>
+          </template>
+        </template>
+      </div>
+      <div class="mt-4 text-center">
+        <template x-if="showUndoRedo">
+          <button @click="undo()" class="text-white font-bold py-1.5 px-3 rounded"
+            :class="autoMoveInterval || undoStack.length == 0 ? 'bg-gray-500' : 'bg-blue-500 hover:bg-blue-600'"
+            :disabled="autoMoveInterval || undoStack.length == 0">
+            Undo
+          </button>
+        </template>
+        <button @click="toggleAutoMove()" class="text-white font-bold py-1.5 px-3 rounded"
+          :class="isEditMode ? 'bg-gray-500' : 'bg-blue-500 hover:bg-blue-600'" :disabled="isEditMode">
+          Auto
         </button>
-      </template>
-      <button @click="toggleAutoMove()" class="text-white font-bold py-1.5 px-3 rounded"
-        :class="isEditMode ? 'bg-gray-500' : 'bg-blue-500 hover:bg-blue-600'" :disabled="isEditMode">
-        Auto
-      </button>
-      <button @click="resetGame()" class="text-white font-bold py-1.5 px-3 rounded"
-        :class="isEditMode ? 'bg-gray-500' : 'bg-blue-500 hover:bg-blue-600'" :disabled="isEditMode">
-        New
-      </button>
-      <button @click="toggleEditMode()" class="text-white font-bold py-1.5 px-3 rounded"
-        :class="autoMoveInterval ? 'bg-gray-500' : 'bg-blue-500 hover:bg-blue-600'" :disabled="autoMoveInterval">
-        Edit
-      </button>
-      <template x-if="showUndoRedo">
-        <button @click="redo()" class="text-white font-bold py-1.5 px-3 rounded"
-          :class="autoMoveInterval || redoStack.length == 0 ? 'bg-gray-500' : 'bg-blue-500 hover:bg-blue-600'"
-          :disabled="autoMoveInterval || redoStack.length == 0">
-          Redo
+        <button @click="resetGame()" class="text-white font-bold py-1.5 px-3 rounded"
+          :class="isEditMode ? 'bg-gray-500' : 'bg-blue-500 hover:bg-blue-600'" :disabled="isEditMode">
+          New
         </button>
-      </template>
+        <button @click="toggleEditMode()" class="text-white font-bold py-1.5 px-3 rounded"
+          :class="autoMoveInterval ? 'bg-gray-500' : 'bg-blue-500 hover:bg-blue-600'" :disabled="autoMoveInterval">
+          Edit
+        </button>
+        <template x-if="showUndoRedo">
+          <button @click="redo()" class="text-white font-bold py-1.5 px-3 rounded"
+            :class="autoMoveInterval || redoStack.length == 0 ? 'bg-gray-500' : 'bg-blue-500 hover:bg-blue-600'"
+            :disabled="autoMoveInterval || redoStack.length == 0">
+            Redo
+          </button>
+        </template>
+      </div>
     </div>
   </div>
   <div
-    class="absolute inset-0 z-10 bg-black bg-opacity-30 opacity-0 flex items-center justify-center transition-all duration-300 ease-in-out"
+    class="absolute inset-0 z-10 overflow-y-auto bg-black bg-opacity-30 opacity-0 flex flex-wrap items-center justify-center transition-all duration-300 ease-in-out"
     :style="`opacity: ${ showSettings ? '1' : '0' }; ${ showSettings ? '' : 'pointer-events: none;' } backdrop-filter: blur(2px);`">
     <div class="bg-white rounded-lg shadow-lg text-lg"
       @click.away="if (!showSerialization && !showGameOver) showSettings = false">
@@ -193,39 +195,50 @@
               </button>
             </div>
             <div style="width: 300px;"></div>
-            <template x-if="leaderboard.length === 0">
-              <p>暂无数据</p>
-            </template>
-            <template x-if="leaderboard.length !== 0">
-              <table class="w-full">
-                <thead>
-                  <tr>
-                    <th class="px-0 sm:px-4">玩家</th>
-                    <th class="px-0 sm:px-4">最大方块</th>
-                    <th class="px-0 sm:px-4">得分</th>
-                    <th class="px-0 sm:px-4">盘面</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-200">
-                  <template x-for="(data, index) in leaderboard" :key="index">
+            <div class="overflow-y-auto" style="position: relative; max-height: 60vh;">
+              <template x-if="downloadAbortController">
+                <div class="absolute inset-0 z-10 flex items-center justify-center" style="backdrop-filter: blur(1px);">
+                  <div class="p-2 bg-gray-300 bg-opacity-75 rounded-xl text-white font-bold">
+                    更新中……
+                  </div>
+                </div>
+              </template>
+              <template x-if="leaderboard.length === 0">
+                <div class="flex items-center justify-center">
+                  <p class="m-4">暂无数据（你可以手动刷新）</p>
+                </div>
+              </template>
+              <template x-if="leaderboard.length !== 0">
+                <table class="w-full">
+                  <thead>
                     <tr>
-                      <td class="px-0 sm:px-4" x-text="data.username"></td>
-                      <td class="px-0 sm:px-4"
-                        x-text="`0x${Math.max(...data.board.flat()).toString(16).toUpperCase()}`"></td>
-                      <td class="px-0 sm:px-4" x-text="`0x${data.score.toString(16).toUpperCase()}`"></td>
-                      <td class="px-0 sm:px-4">
-                        <button class="ml-2"
-                          :class="isEditMode || autoMoveInterval ? 'text-gray-400' : 'text-blue-400 hover:text-blue-600'"
-                          @click="loadLeaderboard(index); $nextTick(() => { showSettings = false })"
-                          :disabled="isEditMode || autoMoveInterval">
-                          加载
-                        </button>
-                      </td>
+                      <th class="px-0 sm:px-4">玩家</th>
+                      <th class="px-0 sm:px-4">最大方块</th>
+                      <th class="px-0 sm:px-4">得分</th>
+                      <th class="px-0 sm:px-4">盘面</th>
                     </tr>
-                  </template>
-                </tbody>
-              </table>
-            </template>
+                  </thead>
+                  <tbody class="divide-y divide-gray-200">
+                    <template x-for="(data, index) in leaderboard" :key="index">
+                      <tr>
+                        <td class="px-0 sm:px-4" x-text="data.username"></td>
+                        <td class="px-0 sm:px-4"
+                          x-text="`0x${Math.max(...data.board.flat()).toString(16).toUpperCase()}`"></td>
+                        <td class="px-0 sm:px-4" x-text="`0x${data.score.toString(16).toUpperCase()}`"></td>
+                        <td class="px-0 sm:px-4">
+                          <button class="ml-2"
+                            :class="isEditMode || autoMoveInterval ? 'text-gray-400' : 'text-blue-400 hover:text-blue-600'"
+                            @click="loadLeaderboard(index); $nextTick(() => { showSettings = false })"
+                            :disabled="isEditMode || autoMoveInterval">
+                            加载
+                          </button>
+                        </td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </template>
+            </div>
           </div>
         </template>
         <template x-if="activeTab === '设置'">
@@ -278,7 +291,7 @@
     </div>
   </div>
   <div
-    class="absolute inset-0 z-20 bg-black bg-opacity-30 opacity-0 flex items-center justify-center transition-all duration-300 ease-in-out"
+    class="absolute inset-0 z-20 overflow-y-auto bg-black bg-opacity-30 opacity-0 flex flex-wrap items-center justify-center transition-all duration-300 ease-in-out"
     :style="`opacity: ${ showSerialization ? '1' : '0' }; ${ showSerialization ? '' : 'pointer-events: none;' } backdrop-filter: blur(1px);`">
     <div class="bg-white rounded-lg shadow-lg p-4 text-lg" @click.away="if (!showGameOver) showSerialization = false">
       <div class="mb-4 flex flex-wrap justify-between items-center">
@@ -336,7 +349,7 @@
     </div>
   </div>
   <div
-    class="absolute inset-0 z-30 bg-black bg-opacity-30 opacity-0 flex items-center justify-center transition-all duration-300 ease-in-out"
+    class="absolute inset-0 z-30 overflow-y-auto bg-black bg-opacity-30 opacity-0 flex flex-wrap items-center justify-center transition-all duration-300 ease-in-out"
     :style="`opacity: ${ showGameOver ? '1' : '0' }; ${ showGameOver ? '' : 'pointer-events: none;' } backdrop-filter: blur(1px);`">
     <div class="bg-white rounded-lg shadow-lg p-4 text-lg" @click.away="showGameOver = false">
       <div class="mb-4 flex flex-wrap justify-between items-center">
@@ -380,7 +393,7 @@
     </div>
   </div>
   <div
-    class="absolute top-0 right-0 z-30 rounded-lg shadow-lg p-2 bg-black bg-opacity-30 opacity-0 transition-all duration-300 ease-in-out"
+    class="absolute top-4 right-4 z-30 rounded-lg shadow-lg p-2 bg-black bg-opacity-30 opacity-0 transition-all duration-300 ease-in-out"
     :style="`opacity: ${ downloadAbortController || uploadAbortController ? '1' : '0' }; ${ downloadAbortController || uploadAbortController ? '' : 'pointer-events: none;' } backdrop-filter: blur(1px);`">
     <div class="flex items-center justify-between">
       <p class="text-white">正在上传/下载数据，请稍候...</p>
