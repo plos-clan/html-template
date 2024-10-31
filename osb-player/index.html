@@ -540,7 +540,7 @@
         return;
       }
       const time = Date.now() - playStartTime;
-      while (queue.start.length && queue.start[0].starttime <= time + 5) {
+      while (queue.start.length && queue.start[0].starttime <= time + 1) {
         const event = queue.start.shift()
         containers[event.layer]?.appendChild(createDiv(event));
       }
@@ -836,33 +836,36 @@
       });
     }
 
-    function load_file(file) {
-      const reader = new FileReader();
-      reader.onload = function (e) {
-        const zip = new JSZip();
-        zip.loadAsync(e.target.result).then(function (zip) {
-          const promises = [];
-          zip.forEach(function (relativePath, zipEntry) {
-            const name = zipEntry.name.toLowerCase();
-            promises.push(zipEntry.async('arraybuffer').then((content) => {
-              files[name] = content;
-            }));
-          });
-          Promise.all(promises).then(() => {
-            for (let name in files) {
-              if (name.endsWith('.osb')) {
-                load_osb_file(files[name]);
-              }
-              if (name.indexOf('/') === -1 && name.indexOf('\\') === -1 && (name.endsWith('.mp3') || name.endsWith('.m4a'))) {
-                load_audio_file(files[name]);
-              }
-            }
-          });
-        });
-      };
-      reader.readAsArrayBuffer(file);
+    function unzip_file_finish() {
+      for (let name in files) {
+        if (name.endsWith('.osb')) {
+          load_osb_file(files[name]);
+        }
+        if (name.indexOf('/') === -1 && (name.endsWith('.mp3') || name.endsWith('.m4a'))) {
+          load_audio_file(files[name]);
+        }
+      }
     }
 
+    function load_file_callback(e) {
+      const zip = new JSZip();
+      zip.loadAsync(e.target.result).then(zip => {
+        const promises = [];
+        zip.forEach((relativePath, zipEntry) => {
+          const name = zipEntry.name.toLowerCase();
+          const promise = zipEntry.async('arraybuffer');
+          promise.then(content => { files[name] = content });
+          promises.push(promise);
+        });
+        Promise.all(promises).then(unzip_file_finish);
+      });
+    }
+
+    function load_file(file) {
+      const reader = new FileReader();
+      reader.onload = load_file_callback;
+      reader.readAsArrayBuffer(file);
+    }
 
     function show_tips() {
       document.getElementById('hide-it').innerHTML = [
@@ -875,9 +878,7 @@
 
     function load_url(url) {
       show_tips();
-      fetch(url).then(response => {
-        response.blob().then(blob => load_file(blob));
-      });
+      fetch(url).then(response => { response.blob().then(blob => load_file(blob)) });
     }
 
     function on_upload(event) {
