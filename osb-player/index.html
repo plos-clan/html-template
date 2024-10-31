@@ -22,6 +22,10 @@
 
       margin: 0;
       padding: 0;
+      box-sizing: border-box;
+
+      width: 100vw;
+      height: 100vh;
 
       background-color: #000;
     }
@@ -62,10 +66,10 @@
       mix-blend-mode: var(--blend-mode);
     }
 
-    #Background>div>*,
-    #Fail>div>*,
-    #Pass>div>*,
-    #Foreground>div>* {
+    #Background>div>:not(svg),
+    #Fail>div>:not(svg),
+    #Pass>div>:not(svg),
+    #Foreground>div>:not(svg) {
       position: absolute;
       top: 0;
       left: 0;
@@ -80,10 +84,28 @@
       transform: var(--transform);
     }
 
+    #Background>div>svg,
+    #Fail>div>svg,
+    #Pass>div>svg,
+    #Foreground>div>svg {
+      display: none;
+
+      width: 0;
+      height: 0;
+    }
+
     #hide-it {
+      position: relative;
+
+      width: max-content;
+      height: max-content;
+
+      padding: 10px 0;
+
       user-select: none;
     }
 
+    #hide-it>input,
     #hide-it>button {
       display: block;
 
@@ -103,12 +125,12 @@
 <body>
   <div id="body">
     <div id="Background"></div>
-    <div id="Fail"></div>
+    <div id="Fail" style="display: none;"></div>
     <div id="Pass"></div>
     <div id="Foreground"></div>
   </div>
   <div id="hide-it">
-    <input type="file" id="fileInput" style="margin: 10px; font-size: xx-large; display: block;" />
+    <input type="file" id="fileInput" style="font-size: xx-large;" />
     <button onclick="load_url(`${this.innerText}.osz`)">43513 Starving Trancer feat. MAKI - only my railgun</button>
     <button onclick="load_url(`${this.innerText}.osz`)">2254087 Zachz Winner - doodle</button>
     <button onclick="load_url(`${this.innerText}.osz`)">2067764 YOASOBI - Yuusha</button>
@@ -360,46 +382,6 @@
       };
     }
 
-    const sbApplyColorMixCache = {};
-    function sbApplyColorMix(element, r, g, b) {
-      const name = JSON.stringify([element.sb_event.filepath, r, g, b]);
-      const entry = sbApplyColorMixCache[name];
-      if (entry) {
-        entry.then(url => { element.sb_img.style.backgroundImage = `url(${url})`; });
-        return;
-      }
-      let img;
-      if (element.sb_event.type === 'Sprite') {
-        img = getImageObj(element.sb_event.filepath);
-      } else {
-        img = new Promise(resolve => {
-          const img = new Image();
-          img.onload = () => resolve(img);
-          loadAnimation(element.sb_event).then(({ url }) => { img.src = url; });
-        });
-      }
-      const promise = new Promise(resolve => {
-        img.then(img => {
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          canvas.width = img.width;
-          canvas.height = img.height;
-          ctx.drawImage(img, 0, 0);
-          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const data = imageData.data;
-          for (let i = 0; i < data.length; i += 4) {
-            data[i] *= r;
-            data[i + 1] *= g;
-            data[i + 2] *= b;
-          }
-          ctx.putImageData(imageData, 0, 0);
-          resolve(canvas.toDataURL());
-        });
-      });
-      promise.then(url => { element.sb_img.style.backgroundImage = `url(${url})`; });
-      sbApplyColorMixCache[name] = promise;
-    }
-
     // 图片大小必须相同
     const spriteSheets = {};
     function createSpriteSheet(imageBuffers, name) {
@@ -463,8 +445,8 @@
     function createStoryboardElement(event) {
       const e = document.createElement('div');
       e.sb_event = event;
+      e.sb_ready = 0;
       e.id = `storyboard-element-${event.id}`;
-      e.sb_img = null;
       e.style.position = 'absolute';
       e.style.zIndex = event.id;
       e.style.opacity = '0';
@@ -485,6 +467,7 @@
       e.sb_color_g = null;
       e.sb_color_b = null;
       e.sb_color_add = null;
+
       let origin = null;
       switch (event.origin) {
         case 'TopLeft': origin = '0% 0%'; break;
@@ -498,11 +481,24 @@
         case 'BottomRight': origin = '100% 100%'; break;
       }
       e.style.transformOrigin = origin;
-      e.sb_ready = 0;
-      storyboard_elements[event.id] = e;
+
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      const filter = document.createElementNS('http://www.w3.org/2000/svg', 'filter');
+      filter.id = `storyboard-filter-${event.id}`;
+      const matrix = document.createElementNS('http://www.w3.org/2000/svg', 'feColorMatrix');
+      matrix.setAttribute('type', 'matrix');
+      matrix.setAttribute('values', '1 0 0 0 0\n0 1 0 0 0\n0 0 1 0 0\n0 0 0 1 0');
+      filter.appendChild(matrix);
+      svg.appendChild(filter);
+      e.appendChild(svg);
+      e.sb_matrix = matrix;
+      e.sb_svg = svg;
+
       const img = document.createElement('div');
-      e.sb_img = img;
       e.appendChild(img);
+      e.sb_img = img;
+
+      storyboard_elements[event.id] = e;
       return { div: e, img: img };
     }
 
@@ -671,13 +667,14 @@
           element.style.transform = rotate;
           element.sb_rotate = rotate;
         }
-        const transform = `${reverse_x ? `scaleX(-1)` : ''} ${reverse_y ? `scaleY(-1)` : ''}`.trim();
+        const transform = `${reverse_x ? 'scaleX(-1)' : ''} ${reverse_y ? 'scaleY(-1)' : ''}`.trim();
         if (element.sb_transform !== transform) {
           element.style.setProperty('--transform', transform);
           element.sb_transform = transform;
         }
         if (color_r !== null && (color_r !== element.sb_color_r || color_g !== element.sb_color_g || color_b !== element.sb_color_b)) {
-          sbApplyColorMix(element, color_r / 255, color_g / 255, color_b / 255);
+          element.sb_matrix.setAttribute('values', `${color_r / 255} 0 0 0 0\n0 ${color_g / 255} 0 0 0\n0 0 ${color_b / 255} 0 0\n0 0 0 1 0`);
+          if (element.sb_color_r === null) element.sb_img.style.filter = `url(#storyboard-filter-${event.id})`;
           element.sb_color_r = color_r;
           element.sb_color_g = color_g;
           element.sb_color_b = color_b;
@@ -707,8 +704,117 @@
       updateStoryboard();
     }
 
+    function osb_lines_to_objects(lines) {
+      const objects = [];
+      let current = null;
+      lines.forEach(line => {
+        if (line[0] === 0) { // 文本前没有空格，是新对象的开始
+          if (line[1] !== 'Sprite' && line[1] !== 'Animation') console.log(`未实现：${line[1]}`);
+          if (current) objects.push(current);
+          current = [line.slice(1)];
+        } else if (current) { // 文本前有空格，是当前对象的一部分
+          current.push(line);
+        }
+      });
+      if (current) objects.push(current);
+      return objects;
+    }
+
+    const osb_command_paranums = { 'F': 2, 'M': 4, 'MX': 2, 'MY': 2, 'S': 2, 'V': 4, 'R': 2, 'C': 6, 'P': 1 };
+
+    const osb_parse_loop_command = (commands, relative_time, data, nline) => {
+      const line = data[nline];
+      if (line[1] !== 'L') return [nline + 1, 0];
+      let starttime = relative_time + line[2];
+      let loopcount = line[3];
+      const indent = data[nline][0];
+      if (loopcount === 0) loopcount = 1; // 某些文件中有数据错误，将 0 视为 1
+      if (loopcount < 0) {
+        let i = nline + 1;
+        while (i < data.length && data[i][0] > indent) i++;
+        return [i, starttime];
+      }
+      let j = 0;
+      let endtimes = [];
+      for (let i = nline + 1; loopcount > 0;) {
+        if (i >= data.length || data[i][0] <= indent) {
+          j = i;
+          i = nline + 1;
+          starttime = Math.max(...endtimes);
+          endtimes = [];
+          loopcount--;
+          continue;
+        }
+        const [next_i, endtime] = osb_parse_command(commands, starttime, data, i);
+        i = next_i;
+        endtimes.push(endtime);
+      }
+      return [j, starttime];
+    };
+
+    const osb_parse_command = (commands, relative_time, data, nline) => {
+      const line = data[nline];
+      if (line[1] === 'L') return osb_parse_loop_command(commands, relative_time, data, nline);
+      const paranum = osb_command_paranums[line[1]];
+      if (!paranum) return [nline + 1, 0];
+      const event_data = {
+        event: line[1],
+        easing: line[2],
+        starttime: relative_time + line[3],
+        endtime: relative_time + (line[4] !== '' ? line[4] : line[3]),
+      };
+      const paras = line.slice(5);
+      if (paras.length < paranum) {
+        for (let i = 0; paras.length < paranum; i++) {
+          paras.push(paras[i]);
+        }
+        commands.push({ ...event_data, params: paras.slice() });
+        return [nline + 1, event_data.endtime];
+      }
+      let last_endtime = 0;
+      for (let i = 0; i < paras.length / paranum; i++) {
+        commands.push({ ...event_data, params: paras.slice(i * paranum, (i + 1) * paranum) });
+        last_endtime = event_data.endtime;
+        const duration = event_data.endtime - event_data.starttime;
+        event_data.starttime = event_data.endtime;
+        event_data.endtime += duration;
+      }
+      return [nline + 1, last_endtime];
+    };
+
+    function osb_parse_object(object, id) {
+      const head = object[0];
+      const event = {
+        id: id,
+        type: head[0],
+        layer: head[1],
+        origin: head[2], // 图像的原点
+        filepath: head[3].replace(/\\/g, '/').toLowerCase(),
+        x: head[4],
+        y: head[5],
+        frameCount: head[0] === 'Animation' ? head[6] : null,
+        frameDelay: head[0] === 'Animation' ? head[7] : null,
+        looptype: head[0] === 'Animation' ? head[8] : null,
+        commands: [],
+        starttime: 0,
+        endtime: 0,
+      };
+      const data = object.slice(1);
+      for (let nline = 0; nline < data.length;) {
+        const [_nline, endtime] = osb_parse_command(event.commands, 0, data, nline);
+        nline = _nline;
+      }
+      event.commands.sort((a, b) => a.endtime - b.endtime);
+      event.starttime = Math.min(...event.commands.map(cmd => cmd.starttime));
+      event.endtime = Math.max(...event.commands.map(cmd => cmd.endtime));
+      return event;
+    }
+
     function load_osb_file(content) {
       const osb = new TextDecoder().decode(content);
+      // 将文件解析为行 -> 过滤空行和注释行 -> 过滤元数据行 -> 解析行 -> 分割行 -> 解析参数
+      // 将 a,b,c,d 解析为 [前缀空格数, a, b, c, d]
+      // 数字按照浮点数解析
       const lines = osb.split('\n').filter(line => line && !line.startsWith('//') && !line.startsWith('[')).map(line => `${line.match(/^(\s*)/)[0].length},${line.trim()}`).map(line => line.split(',').map(part => {
         part = part.trim();
         if (part.startsWith('"') && part.endsWith('"')) {
@@ -719,113 +825,14 @@
           return part;
         }
       }));
-      let next_id = 0;
-      const objects = (lines => {
-        const objects = [];
-        let current = null;
-        lines.forEach(line => {
-          if (line[0] === 0) {
-            if (line[1] !== 'Sprite' && line[1] !== 'Animation') console.log(`未实现：${line[1]}`);
-            if (current) objects.push(current);
-            current = [line.slice(1)];
-          } else if (current) {
-            current.push(line);
-          }
-        });
-        if (current) objects.push(current);
-        return objects;
-      })(lines).map((object) => {
-        const head = object[0];
-        const data = object.slice(1);
-        const event = {
-          id: next_id++,
-          type: head[0],
-          layer: head[1],
-          origin: head[2], // 图像的原点
-          filepath: head[3].replace(/\\/g, '/').toLowerCase(),
-          x: head[4],
-          y: head[5],
-          commands: [],
-        };
-        if (head[0] === 'Animation') {
-          event.frameCount = head[6];
-          event.frameDelay = head[7];
-          event.looptype = head[8];
-        }
-        const parse = (relative_time, nline) => {
-          let line = data[nline];
-          if (line[1] === 'L') { // Loop
-            let starttime = relative_time + line[2];
-            let loopcount = line[3];
-            const indent = data[nline][0];
-            if (loopcount === 0) loopcount = 1;
-            if (loopcount < 0) {
-              let i = nline + 1;
-              while (i < data.length && data[i][0] > indent) i++;
-              return [i, starttime];
-            }
-            let j = 0;
-            let endtimes = [];
-            for (let i = nline + 1; loopcount > 0;) {
-              if (i >= data.length || data[i][0] <= indent) {
-                j = i;
-                i = nline + 1;
-                starttime = Math.max(...endtimes);
-                endtimes = [];
-                loopcount--;
-                continue;
-              }
-              const [next_i, endtime] = parse(starttime, i);
-              i = next_i;
-              endtimes.push(endtime);
-            }
-            return [j, starttime];
-          }
-          const paranums = { 'F': 2, 'M': 4, 'MX': 2, 'MY': 2, 'S': 2, 'V': 4, 'R': 2, 'C': 6, 'P': 1 };
-          const paranum = paranums[line[1]];
-          if (!paranum) return;
-          const event_data = {
-            event: line[1],
-            easing: line[2],
-            starttime: relative_time + line[3],
-            endtime: relative_time + (line[4] !== '' ? line[4] : line[3]),
-          };
-          let last_endtime = 0;
-          line = line.slice(5);
-          if (line.length < paranum) {
-            for (let i = 0; line.length < paranum; i++) {
-              line.push(line[i]);
-            }
-            const d = { ...event_data };
-            d.params = line.slice();
-            event.commands.push(d);
-            last_endtime = event_data.endtime;
-          } else {
-            for (let i = 0; i < line.length / paranum; i++) {
-              const d = { ...event_data };
-              d.params = line.slice(i * paranum, (i + 1) * paranum);
-              event.commands.push(d);
-              last_endtime = event_data.endtime;
-              const duration = event_data.endtime - event_data.starttime;
-              event_data.starttime = event_data.endtime;
-              event_data.endtime += duration;
-            }
-          }
-          return [nline + 1, last_endtime];
-        };
-        for (let nline = 0; nline < data.length;) {
-          nline = parse(0, nline)[0];
-        }
-        event.commands.sort((a, b) => a.endtime - b.endtime);
-        event.starttime = Math.min(...event.commands.map(cmd => cmd.starttime));
-        event.endtime = Math.max(...event.commands.map(cmd => cmd.endtime));
-        return event;
-      });
-      const animations = objects.filter(obj => obj.type === 'Animation');
+      // 将按行分割的列表解析为对象列表
+      const objects = osb_lines_to_objects(lines);
+      const parsed_objects = objects.map(osb_parse_object);
+      const animations = parsed_objects.filter(obj => obj.type === 'Animation');
       Promise.all(animations.map(loadAnimation)).then(() => {
         document.getElementById('hide-it').style.display = 'none';
         document.getElementById('body').style.display = 'block';
-        initStoryboard(objects);
+        initStoryboard(parsed_objects);
       });
     }
 
