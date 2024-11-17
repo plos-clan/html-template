@@ -46,11 +46,54 @@
       margin: 1rem;
       padding: 1rem;
       background-color: #fffa;
-      border-radius: 0.5rem;
+      border-radius: .5rem;
       box-shadow: 0 0 1rem rgba(0, 0, 0, 0.1);
+      max-width: 100%;
+      max-width: -moz-available;
+      max-width: -webkit-fill-available;
+      max-width: fill-available;
+    }
+
+    @media (max-width: 40rem) {
+      #text {
+        font-size: .95em;
+        margin: .5rem;
+      }
+    }
+
+    @media (max-width: 36rem) {
+      #text {
+        font-size: .9em;
+      }
+    }
+
+    @media (max-width: 34rem) {
+      #text {
+        padding: .5rem;
+      }
+    }
+
+    @media (max-width: 33rem) {
+      #text {
+        margin: 0;
+      }
+    }
+
+    @media (max-width: 32rem) {
+      #text {
+        font-size: .85em;
+      }
+    }
+
+    @media (max-width: 30rem) {
+      #text {
+        font-size: .8em;
+      }
     }
 
     #text h1 {
+      text-align: center;
+      font-size: 2em;
       color: #333;
     }
   </style>
