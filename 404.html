@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title></title>
+  <style>
+    body {
+      position: relative;
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background-color: #f0f0f0;
+    }
+
+    a {
+      text-decoration: none;
+    }
+
+    #background {
+      user-select: none;
+      position: fixed;
+      rotate: 20deg;
+      width: 90vmin;
+    }
+
+    #background>p {
+      font-size: 10vmin;
+      font-weight: bold;
+      color: rgba(0, 0, 0, 0.1);
+      margin: 0;
+    }
+
+    #background>p:first-child {
+      font-size: 15vmin;
+    }
+
+    #text {
+      position: fixed;
+      margin: 1rem;
+      padding: 1rem;
+      background-color: #fffa;
+      border-radius: 0.5rem;
+      box-shadow: 0 0 1rem rgba(0, 0, 0, 0.1);
+    }
+
+    #text h1 {
+      color: #333;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="background">
+    <p style="text-align: left;">404</p>
+    <p style="text-align: right;">Not Found</p>
+  </div>
+  <div id="text">
+    <a href="/">
+      <h1><ruby>啊～主人您又跑哪去了，赶紧回来吧！<rt>あ～ご主人様、どこに行ったの？早く戻ってきてください！</rt></ruby></h1>
+    </a>
+  </div>
+</body>
+
+</html>
