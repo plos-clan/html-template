@@ -237,13 +237,13 @@
       element.sb_w = w = w === null ? element.sb_w : w / 640 * 100;
       element.sb_h = h = h === null ? element.sb_h : h / 480 * 100;
       switch (origin) {
-        case 'Centre': x -= w / 2; y -= h / 2; break;
-        case 'CentreLeft': y -= h / 2; break;
-        case 'TopRight': x -= w; break;
-        case 'BottomCentre': x -= w / 2; y -= h; break;
         case 'TopCentre': x -= w / 2; break;
+        case 'TopRight': x -= w; break;
+        case 'CentreLeft': y -= h / 2; break;
+        case 'Centre': x -= w / 2; y -= h / 2; break;
         case 'CentreRight': x -= w; y -= h / 2; break;
         case 'BottomLeft': y -= h; break;
+        case 'BottomCentre': x -= w / 2; y -= h; break;
         case 'BottomRight': x -= w; y -= h; break;
       }
       if (x !== element.sb_ox) element.style.left = x + '%';
@@ -722,7 +722,7 @@
 
     const osb_command_paranums = { 'F': 2, 'M': 4, 'MX': 2, 'MY': 2, 'S': 2, 'V': 4, 'R': 2, 'C': 6, 'P': 1 };
 
-    const osb_parse_loop_command = (commands, relative_time, data, nline) => {
+    function osb_parse_loop_command(commands, relative_time, data, nline) {
       const line = data[nline];
       if (line[1] !== 'L') return [nline + 1, 0];
       let starttime = relative_time + line[2];
@@ -752,7 +752,7 @@
       return [j, starttime];
     };
 
-    const osb_parse_command = (commands, relative_time, data, nline) => {
+    function osb_parse_command(commands, relative_time, data, nline) {
       const line = data[nline];
       if (line[1] === 'L') return osb_parse_loop_command(commands, relative_time, data, nline);
       const paranum = osb_command_paranums[line[1]];
