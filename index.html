@@ -7,11 +7,39 @@
   <title>plos-clan html-template</title>
   <script src="js/tailwindcss.js"></script>
   <script defer src="js/alpinejs.js"></script>
+  <style>
+    a {
+      position: relative;
+
+      overflow: visible;
+    }
+
+    a::after {
+      position: absolute;
+      bottom: -1px;
+      left: 0;
+
+      width: 0;
+      height: 2px;
+
+      content: '';
+      transition: width 0.3s ease;
+
+      opacity: 0.75;
+      background-color: currentColor;
+    }
+
+    a:hover::after {
+      width: 100%;
+    }
+  </style>
 </head>
 
 <body class="bg-gray-100 min-h-screen flex flex-col items-center justify-center">
   <div class="m-4 p-4 bg-white rounded-lg shadow-lg">
-    <h1 class="text-3xl font-bold text-center">plos-clan 的网页模板</h1>
+    <h1 class="text-3xl font-bold text-center">一些轻量的网页</h1>
+    <span class="text-sm text-gray-500 text-right block w-full">by
+      <a href="https://github.com/plos-clan">plos-clan</span>
   </div>
   <div x-data="main()" class="flex flex-wrap justify-center m-auto ">
     <template x-for="(data, path) in projects">
