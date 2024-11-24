@@ -4,892 +4,112 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title></title>
-  <script src="../js/jszip.js"></script>
+  <title>osb-player - plos-clan</title>
   <style>
-    img {
-      user-select: none;
-
-      -webkit-user-drag: none;
-      -khtml-user-drag: none;
-      -moz-user-drag: none;
-      -o-user-drag: none;
-      user-drag: none;
-    }
-
     body {
-      overflow: hidden;
-
+      position: relative;
       margin: 0;
       padding: 0;
-      box-sizing: border-box;
-
       width: 100vw;
       height: 100vh;
-
-      background-color: #000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background-color: #f0f0f0;
     }
 
-    #body {
-      position: relative;
-      --top: 0%;
-      --left: 0%;
-
-      display: none;
-      overflow: hidden;
-
-      width: 640px;
-      height: 480px;
+    a {
+      text-decoration: none;
     }
 
-    #Background,
-    #Fail,
-    #Pass,
-    #Foreground {
-      position: absolute;
-      top: var(--top);
-      left: var(--left);
-
-      width: calc(100% - 2 * var(--left));
-      height: calc(100% - 2 * var(--top));
-    }
-
-    #Background>div,
-    #Fail>div,
-    #Pass>div,
-    #Foreground>div {
-      overflow: hidden;
-
-      --transform: '';
-
-      --blend-mode: normal;
-      mix-blend-mode: var(--blend-mode);
-    }
-
-    #Background>div>:not(svg),
-    #Fail>div>:not(svg),
-    #Pass>div>:not(svg),
-    #Foreground>div>:not(svg) {
-      position: absolute;
-      top: 0;
-      left: 0;
-
-      display: block;
-
-      background-size: 100% 100%;
-
-      width: 100%;
-      height: 100%;
-
-      transform: var(--transform);
-    }
-
-    #Background>div>svg,
-    #Fail>div>svg,
-    #Pass>div>svg,
-    #Foreground>div>svg {
-      display: none;
-
-      width: 0;
-      height: 0;
-    }
-
-    #hide-it {
-      position: relative;
-
-      width: max-content;
-      height: max-content;
-
-      padding: 10px 0;
-
+    #background {
       user-select: none;
+      position: fixed;
+      rotate: 20deg;
+      width: 90vmin;
     }
 
-    #hide-it>input,
-    #hide-it>button {
-      display: block;
-
-      margin: 10px;
-
-      font-size: large;
+    #background>p {
+      font-size: 10vmin;
+      font-weight: bold;
+      color: rgba(0, 0, 0, 0.1);
+      margin: 0;
     }
 
-    #hide-it>p {
-      color: white;
+    #background>p:first-child {
+      font-size: 15vmin;
+    }
 
-      font-size: xx-large;
+    #text {
+      position: fixed;
+      margin: 1rem;
+      padding: 1rem;
+      background-color: #fffa;
+      border-radius: .5rem;
+      box-shadow: 0 0 1rem rgba(0, 0, 0, 0.1);
+      max-width: 100%;
+      max-width: -moz-available;
+      max-width: -webkit-fill-available;
+      max-width: fill-available;
+    }
+
+    @media (max-width: 40rem) {
+      #text {
+        font-size: .95em;
+        margin: .5rem;
+      }
+    }
+
+    @media (max-width: 36rem) {
+      #text {
+        font-size: .9em;
+      }
+    }
+
+    @media (max-width: 34rem) {
+      #text {
+        padding: .5rem;
+      }
+    }
+
+    @media (max-width: 33rem) {
+      #text {
+        margin: 0;
+      }
+    }
+
+    @media (max-width: 32rem) {
+      #text {
+        font-size: .85em;
+      }
+    }
+
+    @media (max-width: 30rem) {
+      #text {
+        font-size: .8em;
+      }
+    }
+
+    #text h1 {
+      text-align: center;
+      font-size: 2em;
+      color: #333;
     }
   </style>
 </head>
 
 <body>
-  <div id="body">
-    <div id="Background"></div>
-    <div id="Fail" style="display: none;"></div>
-    <div id="Pass"></div>
-    <div id="Foreground"></div>
+  <div id="background">
+    <p style="text-align: left;">300</p>
+    <p style="text-align: right;">Multiple Choices</p>
   </div>
-  <div id="hide-it">
-    <input type="file" id="fileInput" style="font-size: xx-large;" />
-    <button onclick="load_url(`${this.innerText}.osz`)">43513 Starving Trancer feat. MAKI - only my railgun</button>
-    <button onclick="load_url(`${this.innerText}.osz`)">2254087 Zachz Winner - doodle</button>
-    <button onclick="load_url(`${this.innerText}.osz`)">2067764 YOASOBI - Yuusha</button>
-    <button onclick="load_url(`${this.innerText}.osz`)">29489 Ano Hana Cast - secret base ~Kimi ga Kureta Mono~</button>
-    <button onclick="load_url(`${this.innerText}.osz`)">1388906 Raphlesia & BilliumMoto - My Love</button>
-    <button onclick="load_url(`${this.innerText}.osz`)">1841885 cYsmix - triangles</button>
-  </div>
-
-  <script>
-    let is_screen_16x9 = false;
-    function resetStoryboardSize() {
-      var div = document.getElementById('body');
-      if (is_screen_16x9) {
-        var scale = Math.min(window.innerWidth / 16, window.innerHeight / 9);
-        div.style.width = 16 * scale + 'px';
-        div.style.height = 9 * scale + 'px';
-        div.style.setProperty('--top', '0%');
-        div.style.setProperty('--left', '12.5%');
-        document.body.style.paddingLeft = (window.innerWidth - 16 * scale) / 2 + 'px';
-        document.body.style.paddingRight = (window.innerWidth - 16 * scale) / 2 + 'px';
-        document.body.style.paddingTop = (window.innerHeight - 9 * scale) / 2 + 'px';
-        document.body.style.paddingBottom = (window.innerHeight - 9 * scale) / 2 + 'px';
-      } else {
-        var scale = Math.min(window.innerWidth / 4, window.innerHeight / 3);
-        div.style.width = 4 * scale + 'px';
-        div.style.height = 3 * scale + 'px';
-        div.style.setProperty('--top', '0%');
-        div.style.setProperty('--left', '0%');
-        document.body.style.paddingLeft = (window.innerWidth - 4 * scale) / 2 + 'px';
-        document.body.style.paddingRight = (window.innerWidth - 4 * scale) / 2 + 'px';
-        document.body.style.paddingTop = (window.innerHeight - 3 * scale) / 2 + 'px';
-        document.body.style.paddingBottom = (window.innerHeight - 3 * scale) / 2 + 'px';
-      }
-    }
-
-    document.body.ondblclick = function () {
-      is_screen_16x9 = !is_screen_16x9;
-      resetStoryboardSize();
-    };
-
-    window.onload = window.onresize = resetStoryboardSize;
-
-    const files = {};
-    let storyboard = [];
-    let storyboard_by_starttime = [];
-    let storyboard_by_endtime = [];
-    let storyboard_elements = {};
-    let playStartTime = 0;
-    let audio = null;
-    const body = document.getElementById('body');
-    const queue = { start: [], stop: [], now: [] };
-    const containers = {
-      'Background': document.getElementById('Background'),
-      'Fail': document.getElementById('Fail'),
-      'Pass': document.getElementById('Pass'),
-      'Foreground': document.getElementById('Foreground'),
-    };
-
-    const imageFileURLs = {};
-    // 加载文件
-    function getImageFileURL(filepath) {
-      if (!imageFileURLs[filepath]) {
-        imageFileURLs[filepath] = URL.createObjectURL(new Blob([files[filepath]]));
-      }
-      return imageFileURLs[filepath];
-    }
-
-    const imageObjs = {};
-    // 加载文件
-    function getImageObj(filepath) {
-      const entry = imageObjs[filepath];
-      if (entry) return entry;
-      const promise = new Promise(resolve => {
-        const img = new Image();
-        img.onload = () => resolve(img);
-        img.src = getImageFileURL(filepath);
-      });
-      imageObjs[filepath] = promise;
-      return promise;
-    }
-
-    function load_audio_file(content) {
-      audio = new Audio(URL.createObjectURL(new Blob([content])));
-      audio.onplay = function () {
-        playStartTime = Date.now();
-      };
-      audio.onended = function () {
-        playStartTime = -1;
-      };
-      audio.play();
-    }
-
-    function sbSetPosition(element, origin, x, y, w, h) {
-      element.sb_pos_x = x;
-      element.sb_pos_y = y;
-      if (origin === null && !element.sb_origin) return;
-      if (origin === null) {
-        origin = element.sb_origin;
-      } else {
-        element.sb_origin = origin;
-      }
-      element.sb_x = x = x === null ? element.sb_x : x / 640 * 100;
-      element.sb_y = y = y === null ? element.sb_y : y / 480 * 100;
-      element.sb_w = w = w === null ? element.sb_w : w / 640 * 100;
-      element.sb_h = h = h === null ? element.sb_h : h / 480 * 100;
-      switch (origin) {
-        case 'TopCentre': x -= w / 2; break;
-        case 'TopRight': x -= w; break;
-        case 'CentreLeft': y -= h / 2; break;
-        case 'Centre': x -= w / 2; y -= h / 2; break;
-        case 'CentreRight': x -= w; y -= h / 2; break;
-        case 'BottomLeft': y -= h; break;
-        case 'BottomCentre': x -= w / 2; y -= h; break;
-        case 'BottomRight': x -= w; y -= h; break;
-      }
-      if (x !== element.sb_ox) element.style.left = x + '%';
-      if (y !== element.sb_oy) element.style.top = y + '%';
-      if (w !== element.sb_ow) element.style.width = w + '%';
-      if (h !== element.sb_oh) element.style.height = h + '%';
-      element.sb_ox = x;
-      element.sb_oy = y;
-      element.sb_ow = w;
-      element.sb_oh = h;
-    }
-
-    function sbSetScale(element, x, y) {
-      element.sb_scale_x = x;
-      element.sb_scale_y = y;
-      sbSetPosition(element, null, null, null, element.sb_rw * x, element.sb_rh * y);
-    }
-
-    const easing_functions = [
-      x => x, // Linear
-      x => Math.sin((x * Math.PI) / 2), // Easing Out
-      x => 1 - Math.cos((x * Math.PI) / 2), // Easing In
-
-      x => x * x, //
-      x => 1 - (1 - x) * (1 - x), //
-      x => x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2, //
-
-      x => x * x * x, //
-      x => 1 - Math.pow(1 - x, 3), //
-      x => x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2, //
-
-      x => x * x * x * x, //
-      x => 1 - Math.pow(1 - x, 4), //
-      x => x < 0.5 ? 8 * x * x * x * x : 1 - Math.pow(-2 * x + 2, 4) / 2, //
-
-      x => x * x * x * x * x, //
-      x => 1 - Math.pow(1 - x, 5), //
-      x => x < 0.5 ? 16 * x * x * x * x * x : 1 - Math.pow(-2 * x + 2, 5), //
-
-      x => 1 - Math.cos((x * Math.PI) / 2), //
-      x => Math.sin((x * Math.PI) / 2), //
-      x => -(Math.cos(Math.PI * x) - 1) / 2, //
-
-      x => Math.pow(2, 10 * x - 10), //
-      x => 1 - Math.pow(2, -10 * x), //
-      x => x < 0.5 ? Math.pow(2, 20 * x - 10) / 2 : (2 - Math.pow(2, -20 * x + 10)) / 2, //
-
-      x => 1 - Math.sqrt(1 - Math.pow(x, 2)), //
-      x => Math.sqrt(1 - Math.pow(x - 1, 2)), //
-      x => x < 0.5 ? (1 - Math.sqrt(1 - Math.pow(2 * x, 2))) / 2 : (Math.sqrt(1 - Math.pow(-2 * x + 2, 2)) + 1) / 2, //
-
-      x => -Math.pow(2, 10 * x - 10) * Math.sin((x * 10 - 10.75) * (2 * Math.PI / 3)), //
-      x => Math.pow(2, -10 * x) * Math.sin((x * 10 - 0.75) * (2 * Math.PI / 3)) + 1, //
-      x => x, //
-      x => x, //
-      x => x < 0.5 ? -(Math.pow(2, 20 * x - 10) * Math.sin((20 * x - 11.125) * (2 * Math.PI / 4.5))) / 2 : (Math.pow(2, -20 * x + 10) * Math.sin((20 * x - 11.125) * (2 * Math.PI / 4.5))) / 2 + 1, //
-
-      x => 2.70158 * x * x * x - 1.70158 * x * x, //
-      x => 1 + 2.70158 * Math.pow(x - 1, 3) + 1.70158 * Math.pow(x - 1, 2), //
-      x => x < 0.5 ? (Math.pow(2 * x, 2) * ((2.5949095 + 1) * 2 * x - 2.5949095)) / 2 : (Math.pow(2 * x - 2, 2) * ((2.5949095 + 1) * (x * 2 - 2) + 2.5949095) + 2) / 2, //
-
-      x => 1 - (x => {
-        const n1 = 7.5625;
-        const d1 = 2.75;
-
-        if (x < 1 / d1) {
-          return n1 * x * x;
-        } else if (x < 2 / d1) {
-          return n1 * (x -= 1.5 / d1) * x + 0.75;
-        } else if (x < 2.5 / d1) {
-          return n1 * (x -= 2.25 / d1) * x + 0.9375;
-        } else {
-          return n1 * (x -= 2.625 / d1) * x + 0.984375;
-        }
-      })(1 - x), //
-      x => {
-        const n1 = 7.5625;
-        const d1 = 2.75;
-
-        if (x < 1 / d1) {
-          return n1 * x * x;
-        } else if (x < 2 / d1) {
-          return n1 * (x -= 1.5 / d1) * x + 0.75;
-        } else if (x < 2.5 / d1) {
-          return n1 * (x -= 2.25 / d1) * x + 0.9375;
-        } else {
-          return n1 * (x -= 2.625 / d1) * x + 0.984375;
-        }
-      }, //
-      x => {
-        const f = x => {
-          const n1 = 7.5625;
-          const d1 = 2.75;
-
-          if (x < 1 / d1) {
-            return n1 * x * x;
-          } else if (x < 2 / d1) {
-            return n1 * (x -= 1.5 / d1) * x + 0.75;
-          } else if (x < 2.5 / d1) {
-            return n1 * (x -= 2.25 / d1) * x + 0.9375;
-          } else {
-            return n1 * (x -= 2.625 / d1) * x + 0.984375;
-          }
-        };
-        return x < 0.5 ? (1 - f(1 - 2 * x)) / 2 : (1 + f(2 * x - 1)) / 2;
-      }, //
-    ];
-
-    function sbInterpolation(v1, v2, starttime, endtime, time, easing) {
-      if (time >= endtime || endtime === starttime) return v2;
-      if (time <= starttime) return v1;
-      const t = (time - starttime) / (endtime - starttime);
-      return v1 + (v2 - v1) * easing_functions[easing](t);
-    }
-
-    function sbInterpolation2(x1, y1, x2, y2, starttime, endtime, time, easing) {
-      if (time >= endtime || endtime === starttime) return { x: x2, y: y2 };
-      if (time <= starttime) return { x: x1, y: y1 };
-      const t = (time - starttime) / (endtime - starttime);
-      const v = easing_functions[easing](t);
-      return {
-        x: x1 + (x2 - x1) * v,
-        y: y1 + (y2 - y1) * v,
-      };
-    }
-
-    function sbInterpolation3(x1, y1, z1, x2, y2, z2, starttime, endtime, time, easing) {
-      if (time >= endtime || endtime === starttime) return { x: x2, y: y2, z: z2 };
-      if (time <= starttime) return { x: x1, y: y1, z: z1 };
-      const t = (time - starttime) / (endtime - starttime);
-      const v = easing_functions[easing](t);
-      return {
-        x: x1 + (x2 - x1) * v,
-        y: y1 + (y2 - y1) * v,
-        z: z1 + (z2 - z1) * v,
-      };
-    }
-
-    // 图片大小必须相同
-    const spriteSheets = {};
-    function createSpriteSheet(imageBuffers, name) {
-      const sprite = spriteSheets[name];
-      if (sprite) return sprite;
-      const promise = new Promise(resolve => {
-        Promise.all(imageBuffers.map(buffer => new Promise((resolve, reject) => {
-          const img = new Image();
-          img.onload = () => resolve(img);
-          img.onerror = reject;
-          img.src = getImageFileURL(buffer);
-        }))).then(images => {
-          const canvas = document.createElement('canvas');
-          canvas.width = images.reduce((sum, img) => sum + img.width, 0);
-          canvas.height = Math.max(...images.map(img => img.height));
-          const ctx = canvas.getContext('2d');
-          images.reduce((xoff, img) => {
-            ctx.drawImage(img, xoff, 0);
-            return xoff + img.width;
-          }, 0);
-          canvas.toBlob(blob => {
-            resolve({
-              width: images[0].width,
-              height: images[0].height,
-              count: images.length,
-              url: URL.createObjectURL(blob),
-            });
-          }, 'image/bmp');
-        });
-      });
-      spriteSheets[name] = promise;
-      return promise;
-    }
-
-    // 预加载动画对象
-    function loadAnimation(event) {
-      const [basename, extname] = event.filepath.split('.');
-      const imageBuffers = Array.from({ length: event.frameCount }, (_, n) => `${basename}${n}.${extname}`);
-      return createSpriteSheet(imageBuffers, event.filepath);
-    }
-
-    const imageInfoCache = {};
-    function loadImage(event) {
-      const sprite = imageInfoCache[event.filepath];
-      if (sprite) return sprite;
-      const promise = new Promise(resolve => {
-        const path = event.filepath;
-        getImageObj(path).then(img => {
-          resolve({
-            width: img.width,
-            height: img.height,
-            count: 1,
-            url: getImageFileURL(path),
-          });
-        });
-      });
-      imageInfoCache[event.filepath] = promise;
-      return promise;
-    }
-
-    function createStoryboardElement(event) {
-      const e = document.createElement('div');
-      e.sb_event = event;
-      e.sb_ready = 0;
-      e.id = `storyboard-element-${event.id}`;
-      e.style.position = 'absolute';
-      e.style.zIndex = event.id;
-      e.style.opacity = '0';
-      e.sb_x = null;
-      e.sb_y = null;
-      e.sb_w = null;
-      e.sb_h = null;
-      e.sb_rw = null;
-      e.sb_rh = null;
-      e.sb_opacity = null;
-      e.sb_pos_x = null;
-      e.sb_pos_y = null;
-      e.sb_scale_x = null;
-      e.sb_scale_y = null;
-      e.sb_rotate = '';
-      e.sb_transform = '';
-      e.sb_color_r = null;
-      e.sb_color_g = null;
-      e.sb_color_b = null;
-      e.sb_color_add = null;
-
-      let origin = null;
-      switch (event.origin) {
-        case 'TopLeft': origin = '0% 0%'; break;
-        case 'TopCentre': origin = '50% 0%'; break;
-        case 'TopRight': origin = '100% 0%'; break;
-        case 'CentreLeft': origin = '0% 50%'; break;
-        case 'Centre': origin = '50% 50%'; break;
-        case 'CentreRight': origin = '100% 50%'; break;
-        case 'BottomLeft': origin = '0% 100%'; break;
-        case 'BottomCentre': origin = '50% 100%'; break;
-        case 'BottomRight': origin = '100% 100%'; break;
-      }
-      e.style.transformOrigin = origin;
-
-      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-      const filter = document.createElementNS('http://www.w3.org/2000/svg', 'filter');
-      filter.id = `storyboard-filter-${event.id}`;
-      const matrix = document.createElementNS('http://www.w3.org/2000/svg', 'feColorMatrix');
-      matrix.setAttribute('type', 'matrix');
-      matrix.setAttribute('values', '1 0 0 0 0\n0 1 0 0 0\n0 0 1 0 0\n0 0 0 1 0');
-      filter.appendChild(matrix);
-      svg.appendChild(filter);
-      e.appendChild(svg);
-      e.sb_matrix = matrix;
-      e.sb_svg = svg;
-
-      const img = document.createElement('div');
-      e.appendChild(img);
-      e.sb_img = img;
-
-      storyboard_elements[event.id] = e;
-      return { div: e, img: img };
-    }
-
-    function sbSetAnimation(img, event, url, count) {
-      if (count === 1) {
-        img.style.backgroundImage = `url(${url})`;
-      }
-      img.style.backgroundSize = `${count * 100}% 100%`;
-      const list = Array.from({ length: count }, (_, n) => `${n / count * 100}% { background-position-x: -${n * 100}%; }`);
-      const keyframes = document.createElement('style');
-      keyframes.innerHTML = `@keyframes storyboard-${event.id} { ${list.join(' ')} 100% { background-position-x: -${(count - 1) * 100}%; } }`;
-      img.appendChild(keyframes);
-      const iteration = event.looptype === 'LoopForever' ? 'infinite' : '1';
-      img.style.animation = `${event.frameDelay * count}ms steps(1) ${iteration} forwards storyboard-${event.id}`;
-      img.style.backgroundImage = `url(${url})`;
-    }
-
-    function createDiv(event) {
-      const { div, img } = createStoryboardElement(event);
-      (event.type === 'Sprite' ? loadImage(event) : loadAnimation(event)).then(({ width, height, count, url }) => {
-        div.sb_rw = width;
-        div.sb_rh = height;
-        sbSetPosition(div, event.origin, event.x, event.y, width, height);
-        sbSetAnimation(img, event, url, count);
-        div.sb_ready = 1;
-      });
-      return div;
-    }
-
-    function updateStoryboard() {
-      if (playStartTime < 0) {
-        playStartTime = 0;
-        initStoryboard();
-        audio.play();
-        return;
-      }
-      if (playStartTime === 0) {
-        requestAnimationFrame(updateStoryboard);
-        return;
-      }
-      const time = Date.now() - playStartTime;
-      while (queue.start.length && queue.start[0].starttime <= time + 1) {
-        const event = queue.start.shift()
-        containers[event.layer]?.appendChild(createDiv(event));
-      }
-      while (queue.stop.length && queue.stop[0].endtime <= time) {
-        const event = queue.stop.shift()
-        storyboard_elements[event.id]?.remove();
-        delete storyboard_elements[event.id];
-      }
-      for (let id in storyboard_elements) {
-        const element = storyboard_elements[id];
-        const event = element.sb_event;
-        if (!element.sb_ready) continue;
-        if (element.sb_ready === 1) {
-          element.style.opacity = '1';
-          element.sb_ready = 2;
-        }
-        let opacity = null;
-        let pos_x = null, pos_y = null;
-        let scale_x = null, scale_y = null;
-        let color_r = null, color_g = null, color_b = null, color_add = null;
-        let rotate = null, reverse_x = null, reverse_y = null;
-        for (let cmd of event.commands) {
-          switch (cmd.event) {
-            case 'M': {
-              if (time < cmd.starttime && pos_x !== null && pos_y !== null) continue;
-              const x1 = cmd.params[0];
-              const y1 = cmd.params[1];
-              const x2 = cmd.params[2];
-              const y2 = cmd.params[3];
-              const { x, y } = sbInterpolation2(x1, y1, x2, y2, cmd.starttime, cmd.endtime, time, cmd.easing);
-              if (time >= cmd.starttime || pos_x === null) pos_x = x;
-              if (time >= cmd.starttime || pos_y === null) pos_y = y;
-              break;
-            }
-            case 'MX': {
-              if (time < cmd.starttime && pos_x !== null) continue;
-              const x1 = cmd.params[0];
-              const x2 = cmd.params[1];
-              const x = sbInterpolation(x1, x2, cmd.starttime, cmd.endtime, time, cmd.easing);
-              pos_x = x;
-              break;
-            }
-            case 'MY': {
-              if (time < cmd.starttime && pos_y !== null) continue;
-              const y1 = cmd.params[0];
-              const y2 = cmd.params[1];
-              const y = sbInterpolation(y1, y2, cmd.starttime, cmd.endtime, time, cmd.easing);
-              pos_y = y;
-              break;
-            }
-            case 'F': {
-              if (time < cmd.starttime && opacity !== null) continue;
-              const o1 = cmd.params[0];
-              const o2 = cmd.params[1];
-              const o = sbInterpolation(o1, o2, cmd.starttime, cmd.endtime, time, cmd.easing);
-              opacity = o;
-              break;
-            }
-            case 'S': {
-              if (time < cmd.starttime && scale_x !== null) continue;
-              const v1 = cmd.params[0];
-              const v2 = cmd.params[1];
-              const v = sbInterpolation(v1, v2, cmd.starttime, cmd.endtime, time, cmd.easing);
-              sbSetScale(element, v, v);
-              scale_x = v;
-              scale_y = v;
-              break;
-            }
-            case 'V': {
-              if (time < cmd.starttime && scale_x !== null) continue;
-              const x1 = cmd.params[0];
-              const y1 = cmd.params[1];
-              const x2 = cmd.params[2];
-              const y2 = cmd.params[3];
-              const { x, y } = sbInterpolation2(x1, y1, x2, y2, cmd.starttime, cmd.endtime, time, cmd.easing);
-              scale_x = x;
-              scale_y = y;
-              break;
-            }
-            case 'R': {
-              if (time < cmd.starttime && rotate !== null) continue;
-              const r1 = cmd.params[0];
-              const r2 = cmd.params[1];
-              const r = sbInterpolation(r1, r2, cmd.starttime, cmd.endtime, time, cmd.easing);
-              if (time >= cmd.starttime || rotate === null) rotate = r ? `rotate(${r}rad)` : '';
-              break;
-            }
-            case 'C': {
-              if (time < cmd.starttime && color_r !== null) continue;
-              const r1 = cmd.params[0];
-              const g1 = cmd.params[1];
-              const b1 = cmd.params[2];
-              const r2 = cmd.params[3];
-              const g2 = cmd.params[4];
-              const b2 = cmd.params[5];
-              const { x, y, z } = sbInterpolation3(r1, g1, b1, r2, g2, b2, cmd.starttime, cmd.endtime, time, cmd.easing);
-              color_r = x;
-              color_g = y;
-              color_b = z;
-              break;
-            }
-            case 'P': {
-              if ((time < cmd.starttime || cmd.endtime < time) && (cmd.starttime !== cmd.endtime)) continue;
-              switch (cmd.params[0]) {
-                case 'H': reverse_x = true; break;
-                case 'V': reverse_y = true; break;
-                case 'A': color_add = true; break;
-              }
-              break;
-            }
-          }
-        }
-        if (opacity !== null && opacity !== element.sb_opacity) {
-          element.sb_img.style.opacity = opacity;
-          element.sb_opacity = opacity;
-        }
-        if ((pos_x !== null && pos_x !== element.sb_pos_x) || (pos_y !== null && pos_y !== element.sb_pos_y)) {
-          sbSetPosition(element, null, pos_x, pos_y, null, null);
-        }
-        if (scale_x !== null && (scale_x !== element.sb_scale_x || scale_y !== element.sb_scale_y)) {
-          sbSetScale(element, scale_x, scale_y);
-        }
-        if (rotate !== null && element.sb_rotate !== rotate) {
-          element.style.transform = rotate;
-          element.sb_rotate = rotate;
-        }
-        const transform = `${reverse_x ? 'scaleX(-1)' : ''} ${reverse_y ? 'scaleY(-1)' : ''}`.trim();
-        if (element.sb_transform !== transform) {
-          element.style.setProperty('--transform', transform);
-          element.sb_transform = transform;
-        }
-        if (color_r !== null && (color_r !== element.sb_color_r || color_g !== element.sb_color_g || color_b !== element.sb_color_b)) {
-          element.sb_matrix.setAttribute('values', `${color_r / 255} 0 0 0 0\n0 ${color_g / 255} 0 0 0\n0 0 ${color_b / 255} 0 0\n0 0 0 1 0`);
-          if (element.sb_color_r === null) element.sb_img.style.filter = `url(#storyboard-filter-${event.id})`;
-          element.sb_color_r = color_r;
-          element.sb_color_g = color_g;
-          element.sb_color_b = color_b;
-        }
-        if (color_add !== element.sb_color_add) {
-          element.style.setProperty('--blend-mode', color_add ? 'lighten' : 'normal');
-          element.sb_color_add = color_add;
-        }
-      }
-      requestAnimationFrame(updateStoryboard);
-    }
-
-    function initStoryboard(objects = null) {
-      if (objects !== null) {
-        storyboard = objects;
-        storyboard_by_starttime = objects.slice().sort((a, b) => a.starttime - b.starttime);
-        storyboard_by_endtime = objects.slice().sort((a, b) => a.endtime - b.endtime);
-      }
-      for (let element in storyboard_elements) {
-        storyboard_elements[element].remove();
-      }
-      storyboard_elements = {};
-      queue.start = storyboard_by_starttime.slice();
-      queue.stop = storyboard_by_endtime.slice();
-      queue.now = [];
-      if (document.fullscreenElement === null) document.body.requestFullscreen();
-      updateStoryboard();
-    }
-
-    function osb_lines_to_objects(lines) {
-      const objects = [];
-      let current = null;
-      lines.forEach(line => {
-        if (line[0] === 0) { // 文本前没有空格，是新对象的开始
-          if (line[1] !== 'Sprite' && line[1] !== 'Animation') console.log(`未实现：${line[1]}`);
-          if (current) objects.push(current);
-          current = [line.slice(1)];
-        } else if (current) { // 文本前有空格，是当前对象的一部分
-          current.push(line);
-        }
-      });
-      if (current) objects.push(current);
-      return objects;
-    }
-
-    const osb_command_paranums = { 'F': 2, 'M': 4, 'MX': 2, 'MY': 2, 'S': 2, 'V': 4, 'R': 2, 'C': 6, 'P': 1 };
-
-    function osb_parse_loop_command(commands, relative_time, data, nline) {
-      const line = data[nline];
-      if (line[1] !== 'L') return [nline + 1, 0];
-      let starttime = relative_time + line[2];
-      let loopcount = line[3];
-      const indent = data[nline][0];
-      if (loopcount === 0) loopcount = 1; // 某些文件中有数据错误，将 0 视为 1
-      if (loopcount < 0) {
-        let i = nline + 1;
-        while (i < data.length && data[i][0] > indent) i++;
-        return [i, starttime];
-      }
-      let j = 0;
-      let endtimes = [];
-      for (let i = nline + 1; loopcount > 0;) {
-        if (i >= data.length || data[i][0] <= indent) {
-          j = i;
-          i = nline + 1;
-          starttime = Math.max(...endtimes);
-          endtimes = [];
-          loopcount--;
-          continue;
-        }
-        const [next_i, endtime] = osb_parse_command(commands, starttime, data, i);
-        i = next_i;
-        endtimes.push(endtime);
-      }
-      return [j, starttime];
-    };
-
-    function osb_parse_command(commands, relative_time, data, nline) {
-      const line = data[nline];
-      if (line[1] === 'L') return osb_parse_loop_command(commands, relative_time, data, nline);
-      const paranum = osb_command_paranums[line[1]];
-      if (!paranum) return [nline + 1, 0];
-      const event_data = {
-        event: line[1],
-        easing: line[2],
-        starttime: relative_time + line[3],
-        endtime: relative_time + (line[4] !== '' ? line[4] : line[3]),
-      };
-      const paras = line.slice(5);
-      if (paras.length < paranum) {
-        for (let i = 0; paras.length < paranum; i++) {
-          paras.push(paras[i]);
-        }
-        commands.push({ ...event_data, params: paras.slice() });
-        return [nline + 1, event_data.endtime];
-      }
-      let last_endtime = 0;
-      for (let i = 0; i < paras.length / paranum; i++) {
-        commands.push({ ...event_data, params: paras.slice(i * paranum, (i + 1) * paranum) });
-        last_endtime = event_data.endtime;
-        const duration = event_data.endtime - event_data.starttime;
-        event_data.starttime = event_data.endtime;
-        event_data.endtime += duration;
-      }
-      return [nline + 1, last_endtime];
-    };
-
-    function osb_parse_object(object, id) {
-      const head = object[0];
-      const event = {
-        id: id,
-        type: head[0],
-        layer: head[1],
-        origin: head[2], // 图像的原点
-        filepath: head[3].replace(/\\/g, '/').toLowerCase(),
-        x: head[4],
-        y: head[5],
-        frameCount: head[0] === 'Animation' ? head[6] : null,
-        frameDelay: head[0] === 'Animation' ? head[7] : null,
-        looptype: head[0] === 'Animation' ? head[8] : null,
-        commands: [],
-        starttime: 0,
-        endtime: 0,
-      };
-      const data = object.slice(1);
-      for (let nline = 0; nline < data.length;) {
-        const [_nline, endtime] = osb_parse_command(event.commands, 0, data, nline);
-        nline = _nline;
-      }
-      event.commands.sort((a, b) => a.endtime - b.endtime);
-      event.starttime = Math.min(...event.commands.map(cmd => cmd.starttime));
-      event.endtime = Math.max(...event.commands.map(cmd => cmd.endtime));
-      return event;
-    }
-
-    function load_osb_file(content) {
-      const osb = new TextDecoder().decode(content);
-      // 将文件解析为行 -> 过滤空行和注释行 -> 过滤元数据行 -> 解析行 -> 分割行 -> 解析参数
-      // 将 a,b,c,d 解析为 [前缀空格数, a, b, c, d]
-      // 数字按照浮点数解析
-      const lines = osb.split('\n').filter(line => line && !line.startsWith('//') && !line.startsWith('[')).map(line => `${line.match(/^(\s*)/)[0].length},${line.trim()}`).map(line => line.split(',').map(part => {
-        part = part.trim();
-        if (part.startsWith('"') && part.endsWith('"')) {
-          return part.slice(1, -1);
-        } else if (!isNaN(parseFloat(part))) {
-          return parseFloat(part);
-        } else {
-          return part;
-        }
-      }));
-      // 将按行分割的列表解析为对象列表
-      const objects = osb_lines_to_objects(lines);
-      const parsed_objects = objects.map(osb_parse_object);
-      const animations = parsed_objects.filter(obj => obj.type === 'Animation');
-      Promise.all(animations.map(loadAnimation)).then(() => {
-        document.getElementById('hide-it').style.display = 'none';
-        document.getElementById('body').style.display = 'block';
-        initStoryboard(parsed_objects);
-      });
-    }
-
-    function unzip_file_finish() {
-      for (let name in files) {
-        if (name.endsWith('.osb')) {
-          load_osb_file(files[name]);
-        }
-        if (name.indexOf('/') === -1 && (name.endsWith('.mp3') || name.endsWith('.m4a'))) {
-          load_audio_file(files[name]);
-        }
-      }
-    }
-
-    function load_file_callback(e) {
-      const zip = new JSZip();
-      zip.loadAsync(e.target.result).then(zip => {
-        const promises = [];
-        zip.forEach((relativePath, zipEntry) => {
-          const name = zipEntry.name.toLowerCase();
-          const promise = zipEntry.async('arraybuffer');
-          promise.then(content => { files[name] = content });
-          promises.push(promise);
-        });
-        Promise.all(promises).then(unzip_file_finish);
-      });
-    }
-
-    function load_file(file) {
-      const reader = new FileReader();
-      reader.onload = load_file_callback;
-      reader.readAsArrayBuffer(file);
-    }
-
-    function show_tips() {
-      document.getElementById('hide-it').innerHTML = [
-        'Loading...',
-        'Double-click to switch between 16:9 and 4:3.',
-        'It is normal to have lag.',
-        'Just wait patiently.',
-      ].map(text => `<p>${text}</p>`).join('');
-    }
-
-    function load_url(url) {
-      show_tips();
-      fetch(url).then(response => { response.blob().then(blob => load_file(blob)) });
-    }
-
-    function on_upload(event) {
-      const file = event.target.files[0];
-      if (!file) return;
-      show_tips();
-      load_file(file);
-    }
-
-    document.getElementById('fileInput').addEventListener('change', on_upload);
-  </script>
+  <main id="text">
+    <h1>osb-player 有多个版本，请选择一个。</h1>
+    <p style="text-align: center;"><a href="old">旧版（旧的解析器，使用 DOM 操作）</a></p>
+    <p style="text-align: center;"><a href="new">新版（新的解析器，使用 DOM 操作）</a></p>
+    <p style="text-align: center;"><a href="pixi">PIXI.JS WebGL 版（新的解析器，使用 PIXI.JS 实现 WebGL 渲染）</a></p>
+  </main>
 </body>
 
 </html>

@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title></title>
+  <script src="../js/jszip.js"></script>
+  <style>
+    img {
+      user-select: none;
+
+      -webkit-user-drag: none;
+      -khtml-user-drag: none;
+      -moz-user-drag: none;
+      -o-user-drag: none;
+      user-drag: none;
+    }
+
+    body {
+      overflow: hidden;
+
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+
+      width: 100vw;
+      height: 100vh;
+
+      background-color: #000;
+    }
+
+    #body {
+      position: relative;
+      --top: 0%;
+      --left: 0%;
+
+      display: none;
+      overflow: hidden;
+
+      width: 640px;
+      height: 480px;
+    }
+
+    #Background,
+    #Fail,
+    #Pass,
+    #Foreground {
+      position: absolute;
+      top: var(--top);
+      left: var(--left);
+
+      width: calc(100% - 2 * var(--left));
+      height: calc(100% - 2 * var(--top));
+    }
+
+    #Background>div,
+    #Fail>div,
+    #Pass>div,
+    #Foreground>div {
+      overflow: hidden;
+
+      --transform: '';
+
+      --blend-mode: normal;
+      mix-blend-mode: var(--blend-mode);
+    }
+
+    #Background>div>:not(svg),
+    #Fail>div>:not(svg),
+    #Pass>div>:not(svg),
+    #Foreground>div>:not(svg) {
+      position: absolute;
+      top: 0;
+      left: 0;
+
+      display: block;
+
+      background-size: 100% 100%;
+
+      width: 100%;
+      height: 100%;
+
+      transform: var(--transform);
+    }
+
+    #Background>div>svg,
+    #Fail>div>svg,
+    #Pass>div>svg,
+    #Foreground>div>svg {
+      display: none;
+
+      width: 0;
+      height: 0;
+    }
+
+    #hide-it {
+      position: relative;
+
+      width: max-content;
+      height: max-content;
+
+      padding: 10px 0;
+
+      user-select: none;
+    }
+
+    #hide-it>input,
+    #hide-it>button {
+      display: block;
+
+      margin: 10px;
+
+      font-size: large;
+    }
+
+    #hide-it>p {
+      color: white;
+
+      font-size: xx-large;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="body">
+    <div id="Background"></div>
+    <div id="Fail" style="display: none;"></div>
+    <div id="Pass"></div>
+    <div id="Foreground"></div>
+  </div>
+  <div id="hide-it">
+    <input type="file" id="fileInput" style="font-size: xx-large;" />
+    <button class="load-button">43513 Starving Trancer feat. MAKI - only my railgun</button>
+    <button class="load-button">2254087 Zachz Winner - doodle</button>
+    <button class="load-button">2067764 YOASOBI - Yuusha</button>
+    <button class="load-button">29489 Ano Hana Cast - secret base ~Kimi ga Kureta Mono~</button>
+    <button class="load-button">1388906 Raphlesia & BilliumMoto - My Love</button>
+    <button class="load-button">1841885 cYsmix - triangles</button>
+  </div>
+
+  <script type="module">
+    import * as osu from './osu/main.mjs';
+
+    async function load_file(file) {
+      const beatmap = await osu.beatmap.load(file);
+      console.log(beatmap);
+    }
+
+    function load_url(url) {
+      fetch(url).then(response => response.blob()).then(blob => load_file(blob));
+    }
+
+    function on_upload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      load_file(file);
+    }
+
+    document.querySelectorAll('.load-button').forEach(button => {
+      button.onclick = function () {
+        load_url(`${this.innerText}.osz`);
+      };
+    });
+
+    document.getElementById('fileInput').addEventListener('change', on_upload);
+  </script>
+</body>
+
+</html>

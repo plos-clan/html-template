@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The OSU! StoryBoard player</title>
+  <script src="../js/pixi.js"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>抱歉网页仍在编写中</h1>
+  <script type="module">
+    import * as osu from './osu/main.mjs';
+  </script>
+  <script type="module">
+    const app = new PIXI.Application();
+    await app.init({ antialias: true, background: '#000', resizeTo: window });
+    document.body.appendChild(app.view);
+    const containers = {
+      Background: new PIXI.Container(),
+      Fail: new PIXI.Container(),
+      Pass: new PIXI.Container(),
+      Foreground: new PIXI.Container(),
+    };
+    containers.Fail.visible = false;
+    app.stage.addChild(...Object.values(containers));
+
+    const imageFileURLs = {};
+    // 加载文件
+    function getImageFileURL(filepath) {
+      if (!imageFileURLs[filepath]) {
+        imageFileURLs[filepath] = URL.createObjectURL(new Blob([files[filepath]]));
+      }
+      return imageFileURLs[filepath];
+    }
+
+    async function loadImage(filepath) {
+      const texture = await Assets.load('https://pixijs.com/assets/bunny.png');
+      PIXI.Loader.shared.add(filepath, getImageFileURL(filepath));
+    }
+
+    class Sprite {
+      origin = [0, 0];
+      animation = [];
+      paths = [];
+      layer = '';
+      commands = []; // OSB commands
+
+      constructor() {
+        this.sprite = new PIXI.Sprite();
+      }
+
+      update(tick) {
+        this.sprite.visible = true;
+        this.sprite.x = 0;
+        this.sprite.y = 0;
+        this.sprite.scale.x = 1;
+        this.sprite.scale.y = 1;
+        this.sprite.rotation = 0;
+        this.sprite.alpha = 1;
+        this.sprite.tint = 0xFFFFFF;
+        this.sprite.blendMode = PIXI.BLEND_MODES.NORMAL;
+        this.sprite.texture = PIXI.Texture.EMPTY;
+        this.sprite.anchor.set(...this.origin);
+        this.sprite.animationSpeed = 1;
+        this.sprite.play();
+        this.sprite.visible = false;
+        containers[this.layer].addChild(this.sprite);
+      }
+    }
+
+    const anchors = {
+      TopLeft: [0, 0],
+      TopCentre: [0.5, 0],
+      TopRight: [1, 0],
+      CentreLeft: [0, 0.5],
+      Centre: [0.5, 0.5],
+      CentreRight: [1, 0.5],
+      BottomLeft: [0, 1],
+      BottomCentre: [0.5, 1],
+      BottomRight: [1, 1],
+    };
+
+    function createSprite(paths, layer, origin) {
+      const textures = paths.map(path => PIXI.Texture.from(path));
+      const sprite = new PIXI.AnimatedSprite(textures);
+      sprite.animationSpeed = 1;
+      sprite.anchor.set(...anchors[origin]);
+      sprite.play();
+      sprite.visible = false;
+      containers[layer].addChild(sprite);
+      return sprite;
+    }
+
+
+
+    // // 加载纹理
+    // app.loader
+    //   .add('image', 'path/to/your/image.png')
+    //   .add('mask', 'path/to/your/mask.png')
+    //   .load(setup);
+
+    // function setup(loader, resources) {
+    //   // 创建图像精灵
+    //   const image = new PIXI.Sprite(resources.image.texture);
+    //   app.stage.addChild(image);
+
+    //   // 创建蒙版精灵
+    //   const mask = new PIXI.Sprite(resources.mask.texture);
+    //   app.stage.addChild(mask);
+
+    //   // 创建RGB蒙版滤镜
+    //   const maskFilter = new PIXI.filters.SpriteMaskFilter(mask);
+    //   image.filters = [maskFilter];
+    // }
+  </script>
+</body>
+
+</html>

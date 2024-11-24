@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title></title>
+  <script src="../js/jszip.js"></script>
+  <style>
+    img {
+      user-select: none;
+
+      -webkit-user-drag: none;
+      -khtml-user-drag: none;
+      -moz-user-drag: none;
+      -o-user-drag: none;
+      user-drag: none;
+    }
+
+    body {
+      overflow: hidden;
+
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+
+      width: 100vw;
+      height: 100vh;
+
+      background-color: #000;
+    }
+
+    #body {
+      position: relative;
+      --top: 0%;
+      --left: 0%;
+
+      display: none;
+      overflow: hidden;
+
+      width: 640px;
+      height: 480px;
+    }
+
+    #Background,
+    #Fail,
+    #Pass,
+    #Foreground {
+      position: absolute;
+      top: var(--top);
+      left: var(--left);
+
+      width: calc(100% - 2 * var(--left));
+      height: calc(100% - 2 * var(--top));
+    }
+
+    #Background>div,
+    #Fail>div,
+    #Pass>div,
+    #Foreground>div {
+      overflow: hidden;
+
+      --transform: '';
+
+      --blend-mode: normal;
+      mix-blend-mode: var(--blend-mode);
+    }
+
+    #Background>div>:not(svg),
+    #Fail>div>:not(svg),
+    #Pass>div>:not(svg),
+    #Foreground>div>:not(svg) {
+      position: absolute;
+      top: 0;
+      left: 0;
+
+      display: block;
+
+      background-size: 100% 100%;
+
+      width: 100%;
+      height: 100%;
+
+      transform: var(--transform);
+    }
+
+    #Background>div>svg,
+    #Fail>div>svg,
+    #Pass>div>svg,
+    #Foreground>div>svg {
+      display: none;
+
+      width: 0;
+      height: 0;
+    }
+
+    #hide-it {
+      position: relative;
+
+      width: max-content;
+      height: max-content;
+
+      padding: 10px 0;
+
+      user-select: none;
+    }
+
+    #hide-it>input,
+    #hide-it>button {
+      display: block;
+
+      margin: 10px;
+
+      font-size: large;
+    }
+
+    #hide-it>p {
+      color: white;
+
+      font-size: xx-large;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="body">
+    <div id="Background"></div>
+    <div id="Fail" style="display: none;"></div>
+    <div id="Pass"></div>
+    <div id="Foreground"></div>
+    <div id="Overlay"></div>
+  </div>
+  <div id="hide-it">
+    <input type="file" id="fileInput" style="font-size: xx-large;" />
+    <button class="load-button">43513 Starving Trancer feat. MAKI - only my railgun</button>
+    <button class="load-button">2254087 Zachz Winner - doodle</button>
+    <button class="load-button">2067764 YOASOBI - Yuusha</button>
+    <button class="load-button">29489 Ano Hana Cast - secret base ~Kimi ga Kureta Mono~</button>
+    <button class="load-button">1388906 Raphlesia & BilliumMoto - My Love</button>
+    <button class="load-button">1841885 cYsmix - triangles</button>
+  </div>
+
+  <script>
+    let is_screen_16x9 = false;
+    function resetStoryboardSize() {
+      var div = document.getElementById('body');
+      if (is_screen_16x9) {
+        var scale = Math.min(window.innerWidth / 16, window.innerHeight / 9);
+        div.style.width = 16 * scale + 'px';
+        div.style.height = 9 * scale + 'px';
+        div.style.setProperty('--top', '0%');
+        div.style.setProperty('--left', '12.5%');
+        document.body.style.paddingLeft = (window.innerWidth - 16 * scale) / 2 + 'px';
+        document.body.style.paddingRight = (window.innerWidth - 16 * scale) / 2 + 'px';
+        document.body.style.paddingTop = (window.innerHeight - 9 * scale) / 2 + 'px';
+        document.body.style.paddingBottom = (window.innerHeight - 9 * scale) / 2 + 'px';
+      } else {
+        var scale = Math.min(window.innerWidth / 4, window.innerHeight / 3);
+        div.style.width = 4 * scale + 'px';
+        div.style.height = 3 * scale + 'px';
+        div.style.setProperty('--top', '0%');
+        div.style.setProperty('--left', '0%');
+        document.body.style.paddingLeft = (window.innerWidth - 4 * scale) / 2 + 'px';
+        document.body.style.paddingRight = (window.innerWidth - 4 * scale) / 2 + 'px';
+        document.body.style.paddingTop = (window.innerHeight - 3 * scale) / 2 + 'px';
+        document.body.style.paddingBottom = (window.innerHeight - 3 * scale) / 2 + 'px';
+      }
+    }
+
+    window.onload = window.onresize = resetStoryboardSize;
+
+    let files = {};
+    let storyboard = [];
+    let storyboard_by_starttime = [];
+    let storyboard_by_endtime = [];
+    let storyboard_elements = {};
+    let playStartTime = 0;
+    let audio = null;
+    const body = document.getElementById('body');
+    const queue = { start: [], stop: [], now: [] };
+    const containers = {
+      'Background': document.getElementById('Background'),
+      'Fail': document.getElementById('Fail'),
+      'Pass': document.getElementById('Pass'),
+      'Foreground': document.getElementById('Foreground'),
+      'Overlay': document.getElementById('Overlay'),
+    };
+
+    const imageFileURLs = {};
+    // 加载文件
+    function getImageFileURL(filepath) {
+      if (!imageFileURLs[filepath]) {
+        imageFileURLs[filepath] = URL.createObjectURL(new Blob([files[filepath]]));
+      }
+      return imageFileURLs[filepath];
+    }
+
+    const imageObjs = {};
+    // 加载文件
+    function getImageObj(filepath) {
+      const entry = imageObjs[filepath];
+      if (entry) return entry;
+      const promise = new Promise(resolve => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.src = getImageFileURL(filepath);
+      });
+      imageObjs[filepath] = promise;
+      return promise;
+    }
+
+    function load_audio_file(content) {
+      audio = new Audio(URL.createObjectURL(new Blob([content])));
+      audio.onplay = function () {
+        playStartTime = performance.now();
+      };
+      audio.onended = function () {
+        playStartTime = -1;
+      };
+      audio.play();
+    }
+
+    function sbSetPosition(element, origin, x, y, w, h) {
+      element.sb_pos_x = x;
+      element.sb_pos_y = y;
+      if (origin === null && !element.sb_origin) return;
+      if (origin === null) {
+        origin = element.sb_origin;
+      } else {
+        element.sb_origin = origin;
+      }
+      element.sb_x = x = x === null ? element.sb_x : x / 640 * 100;
+      element.sb_y = y = y === null ? element.sb_y : y / 480 * 100;
+      element.sb_w = w = w === null ? element.sb_w : w / 640 * 100;
+      element.sb_h = h = h === null ? element.sb_h : h / 480 * 100;
+      switch (origin) {
+        case 'TopCentre': x -= w / 2; break;
+        case 'TopRight': x -= w; break;
+        case 'CentreLeft': y -= h / 2; break;
+        case 'Centre': x -= w / 2; y -= h / 2; break;
+        case 'CentreRight': x -= w; y -= h / 2; break;
+        case 'BottomLeft': y -= h; break;
+        case 'BottomCentre': x -= w / 2; y -= h; break;
+        case 'BottomRight': x -= w; y -= h; break;
+      }
+      if (x !== element.sb_ox) element.style.left = x + '%';
+      if (y !== element.sb_oy) element.style.top = y + '%';
+      if (w !== element.sb_ow) element.style.width = w + '%';
+      if (h !== element.sb_oh) element.style.height = h + '%';
+      element.sb_ox = x;
+      element.sb_oy = y;
+      element.sb_ow = w;
+      element.sb_oh = h;
+    }
+
+    function sbSetScale(element, x, y) {
+      element.sb_scale_x = x;
+      element.sb_scale_y = y;
+      sbSetPosition(element, null, null, null, element.sb_rw * x, element.sb_rh * y);
+    }
+
+    // 图片大小必须相同
+    const spriteSheets = {};
+    function createSpriteSheet(imageBuffers, name) {
+      const sprite = spriteSheets[name];
+      if (sprite) return sprite;
+      const promise = new Promise(resolve => {
+        Promise.all(imageBuffers.map(buffer => new Promise((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => resolve(img);
+          img.onerror = reject;
+          img.src = getImageFileURL(buffer);
+        }))).then(images => {
+          const canvas = document.createElement('canvas');
+          canvas.width = images.reduce((sum, img) => sum + img.width, 0);
+          canvas.height = Math.max(...images.map(img => img.height));
+          const ctx = canvas.getContext('2d');
+          images.reduce((xoff, img) => {
+            ctx.drawImage(img, xoff, 0);
+            return xoff + img.width;
+          }, 0);
+          canvas.toBlob(blob => {
+            resolve({
+              width: images[0].width,
+              height: images[0].height,
+              count: images.length,
+              url: URL.createObjectURL(blob),
+            });
+          }, 'image/bmp');
+        });
+      });
+      spriteSheets[name] = promise;
+      return promise;
+    }
+
+    // 预加载动画对象
+    function loadAnimation(event) {
+      const [basename, extname] = event.path.split('.');
+      const imageBuffers = Array.from({ length: event.frameCount }, (_, n) => `${basename}${n}.${extname}`);
+      return createSpriteSheet(imageBuffers, event.path);
+    }
+
+    const imageInfoCache = {};
+    function loadImage(event) {
+      const sprite = imageInfoCache[event.path];
+      if (sprite) return sprite;
+      const promise = new Promise(resolve => {
+        const path = event.path;
+        getImageObj(path).then(img => {
+          resolve({
+            width: img.width,
+            height: img.height,
+            count: 1,
+            url: getImageFileURL(path),
+          });
+        });
+      });
+      imageInfoCache[event.path] = promise;
+      return promise;
+    }
+
+    function createStoryboardElement(event) {
+      const e = document.createElement('div');
+      e.sb_event = event;
+      e.sb_ready = 0;
+      e.id = `storyboard-element-${event.id}`;
+      e.style.position = 'absolute';
+      e.style.zIndex = event.id;
+      e.style.opacity = '0';
+
+      let origin = null;
+      switch (event.origin) {
+        case 'TopLeft': origin = '0% 0%'; break;
+        case 'TopCentre': origin = '50% 0%'; break;
+        case 'TopRight': origin = '100% 0%'; break;
+        case 'CentreLeft': origin = '0% 50%'; break;
+        case 'Centre': origin = '50% 50%'; break;
+        case 'CentreRight': origin = '100% 50%'; break;
+        case 'BottomLeft': origin = '0% 100%'; break;
+        case 'BottomCentre': origin = '50% 100%'; break;
+        case 'BottomRight': origin = '100% 100%'; break;
+      }
+      e.style.transformOrigin = origin;
+
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      const filter = document.createElementNS('http://www.w3.org/2000/svg', 'filter');
+      filter.id = `storyboard-filter-${event.id}`;
+      const matrix = document.createElementNS('http://www.w3.org/2000/svg', 'feColorMatrix');
+      matrix.setAttribute('type', 'matrix');
+      matrix.setAttribute('values', '1 0 0 0 0\n0 1 0 0 0\n0 0 1 0 0\n0 0 0 1 0');
+      filter.appendChild(matrix);
+      svg.appendChild(filter);
+      e.appendChild(svg);
+      e.sb_matrix = matrix;
+      e.sb_svg = svg;
+
+      const img = document.createElement('div');
+      img.style.filter = `url(#storyboard-filter-${event.id})`;
+      e.appendChild(img);
+      e.sb_img = img;
+
+      storyboard_elements[event.id] = e;
+      return { div: e, img: img };
+    }
+
+    function sbSetAnimation(img, event, url, count) {
+      if (count === 1) {
+        img.style.backgroundImage = `url(${url})`;
+      }
+      img.style.backgroundSize = `${count * 100}% 100%`;
+      const list = Array.from({ length: count }, (_, n) => `${n / count * 100}% { background-position-x: -${n * 100}%; }`);
+      const keyframes = document.createElement('style');
+      keyframes.innerHTML = `@keyframes storyboard-${event.id} { ${list.join(' ')} 100% { background-position-x: -${(count - 1) * 100}%; } }`;
+      img.appendChild(keyframes);
+      const iteration = event.looptype === 'LoopForever' ? 'infinite' : '1';
+      img.style.animation = `${event.frameDelay * count}ms steps(1) ${iteration} forwards storyboard-${event.id}`;
+      img.style.backgroundImage = `url(${url})`;
+      img.style.animationPlayState = 'paused';
+    }
+
+    function createDiv(event) {
+      const { div, img } = createStoryboardElement(event);
+      (event.type === 'Sprite' ? loadImage(event) : loadAnimation(event)).then(({ width, height, count, url }) => {
+        div.sb_rw = width;
+        div.sb_rh = height;
+        sbSetPosition(div, event.origin, event.x, event.y, width, height);
+        sbSetAnimation(img, event, url, count);
+        div.sb_ready = 1;
+      });
+      return div;
+    }
+
+    function updateStoryboard() {
+      if (playStartTime < 0) {
+        playStartTime = 0;
+        initStoryboard();
+        audio.play();
+        return;
+      }
+      if (playStartTime === 0) {
+        requestAnimationFrame(updateStoryboard);
+        return;
+      }
+      const time = performance.now() - playStartTime;
+      while (queue.start.length && queue.start[0].starttime <= time + 1000) {
+        const event = queue.start.shift()
+        containers[event.layer]?.appendChild(createDiv(event));
+      }
+      while (queue.stop.length && queue.stop[0].endtime <= time) {
+        const event = queue.stop.shift()
+        storyboard_elements[event.id]?.remove();
+        delete storyboard_elements[event.id];
+      }
+      for (let id in storyboard_elements) {
+        const element = storyboard_elements[id];
+        const event = element.sb_event;
+        if (!element.sb_ready) continue;
+        if (element.sb_ready === 1) {
+          if (time < event.starttime) continue;
+          element.style.opacity = '1';
+          if (event.type === 'Animation') {
+            element.sb_img.style.animationPlayState = 'running';
+          }
+          element.sb_ready = 2;
+        }
+        const data = event.tick(time);
+        element.sb_img.style.opacity = data.a;
+        sbSetPosition(element, null, data.x, data.y, null, null);
+        sbSetScale(element, data.w, data.h);
+        element.style.transform = `rotate(${data.ro}rad)`;
+        element.style.setProperty('--transform', `${data.hr ? 'scaleX(-1)' : ''} ${data.vr ? 'scaleY(-1)' : ''}`.trim());
+        element.sb_matrix.setAttribute('values', `${data.r} 0 0 0 0\n0 ${data.g} 0 0 0\n0 0 ${data.b} 0 0\n0 0 0 1 0`);
+        element.style.setProperty('--blend-mode', data.ma ? 'lighten' : 'normal');
+      }
+      requestAnimationFrame(updateStoryboard);
+    }
+
+    function initStoryboard(objects = null) {
+      if (objects !== null) {
+        storyboard = objects;
+        storyboard_by_starttime = objects.slice().sort((a, b) => a.starttime - b.starttime);
+        storyboard_by_endtime = objects.slice().sort((a, b) => a.endtime - b.endtime);
+      }
+      for (let element in storyboard_elements) {
+        storyboard_elements[element].remove();
+      }
+      storyboard_elements = {};
+      queue.start = storyboard_by_starttime.slice();
+      queue.stop = storyboard_by_endtime.slice();
+      queue.now = [];
+      storyboard.forEach(event => event.reset());
+      if (document.fullscreenElement === null) document.body.requestFullscreen();
+      updateStoryboard();
+    }
+  </script>
+
+  <script type="module">
+    import * as osu from './osu/main.mjs';
+
+    async function load_file(file) {
+      const data = await osu.beatmap.load(file);
+      const beatmap = data.beatmaps[0];
+      const storyboard = data.storyboard;
+      files = data.files;
+      document.getElementById('hide-it').style.display = 'none';
+      document.getElementById('body').style.display = 'block';
+      if (beatmap.general.WidescreenStoryboard) {
+        is_screen_16x9 = true;
+        resetStoryboardSize();
+      }
+      load_audio_file(data.files[beatmap.general.AudioFilename]);
+      initStoryboard(storyboard.all);
+    }
+
+    function show_tips() {
+      document.getElementById('hide-it').innerHTML = [
+        'Loading...',
+        'It is normal to have lag.',
+        'Just wait patiently.',
+      ].map(text => `<p>${text}</p>`).join('');
+    }
+
+    function load_url(url) {
+      show_tips();
+      fetch(url).then(response => response.blob()).then(blob => load_file(blob));
+    }
+
+    function on_upload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      show_tips();
+      load_file(file);
+    }
+
+    document.querySelectorAll('.load-button').forEach(button => {
+      button.onclick = function () {
+        load_url(`${this.innerText}.osz`);
+      };
+    });
+
+    document.getElementById('fileInput').addEventListener('change', on_upload);
+  </script>
+</body>
+
+</html>
