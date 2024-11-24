@@ -60,6 +60,13 @@ function parse_sprite_object(object, id) {
   return new Sprite(head, id, cmds);
 }
 
+class Break {
+  constructor(object) {
+    this.starttime = object[0][1];
+    this.endtime = object[0][2];
+  }
+}
+
 export const sprite_types = {
   0: 'Background',
   1: 'Video',
@@ -125,17 +132,21 @@ export class Events {
   all = [];
 
   constructor(lines) {
+    if (!lines) return;
     const objects = lines_to_objects(lines);
     objects.forEach((object, id) => {
       switch (object[0][0]) {
         case 'Background':
           this.backgrounds.push(object);
+          this.all.push(this.backgrounds[this.backgrounds.length - 1]);
           break;
         case 'Video':
           this.videos.push(object);
+          this.all.push(this.videos[this.videos.length - 1]);
           break;
         case 'Break':
-          this.breaks.push(object);
+          this.breaks.push(new Break(object));
+          this.all.push(this.breaks[this.breaks.length - 1]);
           break;
         case 'Sprite':
           this.sprites.push(parse_sprite_object(object, id));
@@ -148,4 +159,15 @@ export class Events {
       }
     });
   }
+}
+
+export function combine(events1, events2) {
+  const events = new Events();
+  events.backgrounds = events1.backgrounds.concat(events2.backgrounds);
+  events.videos = events1.videos.concat(events2.videos);
+  events.breaks = events1.breaks.concat(events2.breaks);
+  events.sprites = events1.sprites.concat(events2.sprites);
+  events.animations = events1.animations.concat(events2.animations);
+  events.all = events1.all.concat(events2.all);
+  return events;
 }
