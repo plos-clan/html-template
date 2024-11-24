@@ -62,16 +62,16 @@ function parse_sprite_object(object, id) {
 
 class Background {
   constructor(object) {
-    this.filename = object[0][1];
-    this.x = object[0][1];
-    this.y = object[0][1];
+    this.filename = object[0][2].replace(/\\/g, '/').toLowerCase();
+    this.x = object[0][3];
+    this.y = object[0][4];
   }
 }
 
 class Video {
   constructor(object) {
     this.starttime = object[0][1];
-    this.filename = object[0][2];
+    this.filename = object[0][2].replace(/\\/g, '/').toLowerCase();
     this.x = object[0][3];
     this.y = object[0][4];
   }

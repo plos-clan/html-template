@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title></title>
   <script src="../js/jszip.js"></script>
+  <script src="../js/flv.js"></script>
   <style>
     img {
       user-select: none;
@@ -49,7 +50,12 @@
 
     #BeatmapBackground,
     #Video {
+      position: absolute;
+      top: 0;
+      left: 0;
       object-fit: contain;
+      width: 100%;
+      height: 100%;
     }
 
     #Break {
@@ -70,7 +76,6 @@
       user-select: none;
     }
 
-    #body>:first-child,
     #Background,
     #Fail,
     #Pass,
@@ -154,11 +159,11 @@
 </head>
 
 <body>
+  <img id="BeatmapBackground" />
+  <video id="Video">
+    <source id="VideoSource">
+  </video>
   <div id="body">
-    <div style="z-index: -1;">
-      <img id="BeatmapBackground" />
-      <video id="Video"></video>
-    </div>
     <div id="Background" style="z-index: 0;"></div>
     <div id="Fail" style="z-index: 65536;display: none;"></div>
     <div id="Pass" style="z-index: 131072;"></div>
@@ -226,6 +231,8 @@
       'Overlay': document.getElementById('Overlay'),
     };
     let breaks = [];
+    let videos = [];
+    let next_video_index = 0;
     let audioLeadIn = 0;
 
     const imageFileURLs = {};
@@ -426,6 +433,59 @@
       return div;
     }
 
+    var flv_player = null;
+    function updateVideo(time) {
+      const video = videos[next_video_index];
+      if (next_video_index < videos.length && videos[next_video_index].starttime <= time) {
+        if (flv_player !== null) {
+          flv_player.unload();
+          flv_player.detachMediaElement();
+          flv_player.destroy();
+          flv_player = null;
+        }
+        const player = document.getElementById('Video');
+        player.currentTime = 0;
+        if (video.filename.endsWith('.flv')) {
+          flv_player = flvjs.createPlayer({
+            type: 'flv',
+            url: URL.createObjectURL(new Blob([files[video.filename]]))
+          });
+          flv_player.attachMediaElement(document.getElementById('Video'));
+          flv_player.load();
+          flv_player.play();
+        } else {
+          const source = document.getElementById('VideoSource');
+          source.src = URL.createObjectURL(new Blob([files[video.filename]]));
+          player.load();
+          player.play();
+        }
+        next_video_index++;
+      }
+    }
+
+    function updateBreak(time) {
+      let breakend = null;
+      if (time < audioLeadIn) {
+        breakend = audioLeadIn;
+      } else for (const { starttime, endtime } of breaks) {
+        if (endtime < time) continue;
+        if (time < starttime) break;
+        breakend = endtime;
+        break;
+      }
+      if (breakend !== null) {
+        if (breakend - time < 500) {
+          document.getElementById('Break').style.opacity = 0;
+        } else {
+          document.getElementById('Break').style.opacity = 1;
+        }
+        document.getElementById('break-time').innerText = `${((breakend - time) / 1000).toFixed(2)}`;
+      } else {
+        document.getElementById('Break').style.opacity = 0;
+        document.getElementById('break-time').innerText = `0`;
+      }
+    }
+
     function updateStoryboard() {
       if (playStartTime < 0) {
         playStartTime = 0;
@@ -467,31 +527,15 @@
         element.sb_matrix.setAttribute('values', `${data.r} 0 0 0 0\n0 ${data.g} 0 0 0\n0 0 ${data.b} 0 0\n0 0 0 1 0`);
         element.style.setProperty('--blend-mode', data.ma ? 'lighten' : 'normal');
       }
-      let breakend = null;
-      if (time < audioLeadIn) {
-        breakend = audioLeadIn;
-      } else for (const { starttime, endtime } of breaks) {
-        if (endtime < time) continue;
-        if (time < starttime) break;
-        breakend = endtime;
-        break;
-      }
-      if (breakend !== null) {
-        if (breakend - time < 500) {
-          document.getElementById('Break').style.opacity = 0;
-        } else {
-          document.getElementById('Break').style.opacity = 1;
-        }
-        document.getElementById('break-time').innerText = `${((breakend - time) / 1000).toFixed(2)}`;
-      } else {
-        document.getElementById('Break').style.opacity = 0;
-        document.getElementById('break-time').innerText = `0`;
-      }
+      updateVideo(time);
+      updateBreak(time);
       requestAnimationFrame(updateStoryboard);
     }
 
     function initStoryboard(objects = null) {
+      now_video_index = 0;
       if (objects !== null) {
+        videos = objects.videos;
         breaks = objects.breaks;
         const objs = objects.all.filter(obj => obj.type === 'Sprite' || obj.type === 'Animation');
         storyboard = objs;
