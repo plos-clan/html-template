@@ -60,6 +60,23 @@ function parse_sprite_object(object, id) {
   return new Sprite(head, id, cmds);
 }
 
+class Background {
+  constructor(object) {
+    this.filename = object[0][1];
+    this.x = object[0][1];
+    this.y = object[0][1];
+  }
+}
+
+class Video {
+  constructor(object) {
+    this.starttime = object[0][1];
+    this.filename = object[0][2];
+    this.x = object[0][3];
+    this.y = object[0][4];
+  }
+}
+
 class Break {
   constructor(object) {
     this.starttime = object[0][1];
@@ -131,17 +148,21 @@ export class Events {
   animations = [];
   all = [];
 
-  constructor(lines) {
-    if (!lines) return;
+  constructor(lines, next_event_id) {
+    if (!lines) {
+      this.next_event_id = next_event_id;
+      return;
+    }
     const objects = lines_to_objects(lines);
     objects.forEach((object, id) => {
+      id += next_event_id;
       switch (object[0][0]) {
         case 'Background':
-          this.backgrounds.push(object);
+          this.backgrounds.push(new Background(object));
           this.all.push(this.backgrounds[this.backgrounds.length - 1]);
           break;
         case 'Video':
-          this.videos.push(object);
+          this.videos.push(new Video(object));
           this.all.push(this.videos[this.videos.length - 1]);
           break;
         case 'Break':
@@ -158,10 +179,13 @@ export class Events {
           break;
       }
     });
+    this.next_event_id = next_event_id + objects.length;
   }
 }
 
 export function combine(events1, events2) {
+  if (!events1) return events2;
+  if (!events2) return events1;
   const events = new Events();
   events.backgrounds = events1.backgrounds.concat(events2.backgrounds);
   events.videos = events1.videos.concat(events2.videos);

@@ -322,13 +322,13 @@ class Beatmap {
   colours = {};
   hit_objects = [];
 
-  constructor(data) {
+  constructor(data, next_storyboard_event_id) {
     data = parse_file(data);
     this.general = new General(data.General);
     this.editor = new Editor(data.Editor);
     this.metadata = new Metadata(data.Metadata);
     this.difficulty = new Difficulty(data.Difficulty);
-    this.events = new Events(data.Events);
+    this.events = new Events(data.Events, next_storyboard_event_id);
     this.timing_points = data.TimingPoints.map(point => new TimingPoint(point));
     this.colours = new Colours(data.Colours);
     this.hit_objects = data.HitObjects.map(object => new HitObject(object));
@@ -339,6 +339,7 @@ class BeatmapSet {
   files = {};
   beatmaps = [];
   storyboard = null;
+  next_storyboard_event_id = 0;
 }
 
 export async function load(file) {
@@ -352,7 +353,9 @@ export async function load(file) {
   const beatmap_data = new BeatmapSet();
   beatmap_data.files = files;
   for (let name in files) if (name.endsWith('.osu')) {
-    beatmap_data.beatmaps.push(new Beatmap(new TextDecoder().decode(files[name])));
+    const beatmap = new Beatmap(new TextDecoder().decode(files[name]), beatmap_data.next_storyboard_event_id);
+    beatmap_data.beatmaps.push(beatmap);
+    beatmap_data.next_storyboard_event_id = beatmap.events.next_event_id;
   }
   for (let name in files) if (name.endsWith('.osb')) {
     if (beatmap_data.storyboard !== null) {
@@ -369,7 +372,8 @@ export async function load(file) {
       || data.HitObjects.length !== 0) {
       console.warn('Storyboard data should not contain any section other than Events');
     }
-    beatmap_data.storyboard = new Events(data.Events);
+    beatmap_data.storyboard = new Events(data.Events, beatmap_data.next_storyboard_event_id);
+    beatmap_data.next_storyboard_event_id = beatmap_data.storyboard.next_event_id;
   }
   // 目前无法计算难度，使用 OD 代替
   beatmap_data.beatmaps.sort((a, b) => parseFloat(a.difficulty.OverallDifficulty) - parseFloat(b.difficulty.OverallDifficulty));

@@ -49,6 +49,14 @@ export function parse(commands, relative_time, data, nline) {
     starttime: relative_time + line[3],
     endtime: relative_time + (line[4] !== '' ? line[4] : line[3]),
   };
+  if (!isFinite(command.starttime) || !isFinite(command.endtime)) {
+    console.warn('Invalid time');
+    return [nline + 1, 0];
+  }
+  if (command.starttime > command.endtime) {
+    console.warn('Start time is greater than end time');
+    return [nline + 1, 0];
+  }
   const paras = line.slice(5);
   if (paras.length < paranum) {
     for (let i = 0; paras.length < paranum; i++) {
