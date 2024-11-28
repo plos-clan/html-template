@@ -254,46 +254,7 @@ class Colours {
   }
 }
 
-class HitSample {
-  normal = 0;
-  addition = 0;
-  index = 0;
-  volume = 0;
-  filename = '';
-
-  constructor(data) {
-    if (data.length === 0) return;
-    data = data.split(':');
-    this.normal = parseInt(data[0]);
-    this.addition = parseInt(data[1]);
-    this.index = parseInt(data[2]);
-    this.volume = parseInt(data[3]);
-    this.filename = data[4];
-  }
-}
-
-class HitObject {
-  x = 0;
-  y = 0;
-  time = 0;
-  type = 0;
-  hit_sound = 0;
-  params = [];
-  hit_sample = null;
-
-  constructor(data) {
-    data = data.split(',');
-    this.x = parseInt(data[0]);
-    this.y = parseInt(data[1]);
-    this.time = parseInt(data[2]);
-    this.type = parseInt(data[3]);
-    this.hit_sound = parseInt(data[4]);
-    this.params = data.slice(5, -1)
-    if (data[data.length - 1] !== '' && data[data.length - 1] !== '0:0:0:0:') {
-      this.hit_sample = new HitSample(data[data.length - 1]);
-    }
-  }
-}
+import { HitObject } from './hitobject.mjs';
 
 function parse_file(text) {
   let lines = text.split('\n').filter(line => line && !line.startsWith('//')).map(line => line.trimEnd());
@@ -340,9 +301,44 @@ class BeatmapSet {
   beatmaps = [];
   storyboard = null;
   next_storyboard_event_id = 0;
+
+  constructor(files) {
+    this.files = files;
+  }
+
+  load_osu_file() {
+    for (let name in this.files) if (name.endsWith('.osu')) {
+      const beatmap = new Beatmap(new TextDecoder().decode(this.files[name]), this.next_storyboard_event_id);
+      this.beatmaps.push(beatmap);
+      this.next_storyboard_event_id = beatmap.events.next_event_id;
+    }
+    // 目前无法计算难度，使用 OD 代替
+    this.beatmaps.sort((a, b) => a.difficulty.OverallDifficulty - b.difficulty.OverallDifficulty);
+  }
+
+  load_osb_file() {
+    for (let name in this.files) if (name.endsWith('.osb')) {
+      if (this.storyboard !== null) {
+        console.warn('Multiple storyboards found in beatmap set, ignoring additional');
+        continue;
+      }
+      const data = parse_file(new TextDecoder().decode(this.files[name]));
+      if (Object.keys(data.General).length !== 0
+        || Object.keys(data.Editor).length !== 0
+        || Object.keys(data.Metadata).length !== 0
+        || Object.keys(data.Difficulty).length !== 0
+        || data.TimingPoints.length !== 0
+        || Object.keys(data.Colours).length !== 0
+        || data.HitObjects.length !== 0) {
+        console.warn('Storyboard data should not contain any section other than Events');
+      }
+      this.storyboard = new Events(data.Events, this.next_storyboard_event_id);
+      this.next_storyboard_event_id = this.storyboard.next_event_id;
+    }
+  }
 }
 
-export async function load(file) {
+async function load_zip_file(file) {
   const arrayBuffer = await file.arrayBuffer();
   const zip = await new JSZip().loadAsync(arrayBuffer);
   const files = {};
@@ -350,32 +346,13 @@ export async function load(file) {
     const content = await zip.files[relativePath].async('arraybuffer');
     files[relativePath.toLowerCase()] = content;
   }));
-  const beatmap_data = new BeatmapSet();
-  beatmap_data.files = files;
-  for (let name in files) if (name.endsWith('.osu')) {
-    const beatmap = new Beatmap(new TextDecoder().decode(files[name]), beatmap_data.next_storyboard_event_id);
-    beatmap_data.beatmaps.push(beatmap);
-    beatmap_data.next_storyboard_event_id = beatmap.events.next_event_id;
-  }
-  for (let name in files) if (name.endsWith('.osb')) {
-    if (beatmap_data.storyboard !== null) {
-      console.warn('Multiple storyboards found in beatmap set, ignoring additional');
-      continue;
-    }
-    const data = parse_file(new TextDecoder().decode(files[name]));
-    if (Object.keys(data.General).length !== 0
-      || Object.keys(data.Editor).length !== 0
-      || Object.keys(data.Metadata).length !== 0
-      || Object.keys(data.Difficulty).length !== 0
-      || data.TimingPoints.length !== 0
-      || Object.keys(data.Colours).length !== 0
-      || data.HitObjects.length !== 0) {
-      console.warn('Storyboard data should not contain any section other than Events');
-    }
-    beatmap_data.storyboard = new Events(data.Events, beatmap_data.next_storyboard_event_id);
-    beatmap_data.next_storyboard_event_id = beatmap_data.storyboard.next_event_id;
-  }
-  // 目前无法计算难度，使用 OD 代替
-  beatmap_data.beatmaps.sort((a, b) => parseFloat(a.difficulty.OverallDifficulty) - parseFloat(b.difficulty.OverallDifficulty));
-  return beatmap_data;
+  return files;
+}
+
+export async function load(file) {
+  const files = load_zip_file(file);
+  const set = new BeatmapSet(files);
+  set.load_osu_file();
+  set.load_osb_file();
+  return set;
 }
