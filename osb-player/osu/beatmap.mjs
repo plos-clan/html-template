@@ -350,7 +350,7 @@ async function load_zip_file(file) {
 }
 
 export async function load(file) {
-  const files = load_zip_file(file);
+  const files = await load_zip_file(file);
   const set = new BeatmapSet(files);
   set.load_osu_file();
   set.load_osb_file();
