@@ -186,7 +186,7 @@
     <button class="load-button">1841885 cYsmix - triangles</button>
   </div>
 
-  <script>
+  <script type="module">
     let is_screen_16x9 = false;
     function resetStoryboardSize() {
       var div = document.getElementById('body');
@@ -533,7 +533,6 @@
     }
 
     function initStoryboard(objects = null) {
-      now_video_index = 0;
       if (objects !== null) {
         videos = objects.videos;
         breaks = objects.breaks;
@@ -555,9 +554,7 @@
       setTimeout(() => audio.play(), audioLeadIn);
       playStartTime = performance.now();
     }
-  </script>
 
-  <script type="module">
     import * as osu from './osu/main.mjs';
 
     async function load_file(file) {
