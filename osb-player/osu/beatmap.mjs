@@ -338,8 +338,10 @@ class BeatmapSet {
   }
 }
 
-async function load_zip_file(file) {
+async function load_zip_file(file, show_tips = null) {
+  if (show_tips) show_tips('Receiving file...');
   const arrayBuffer = await file.arrayBuffer();
+  if (show_tips) show_tips('Unziping file...');
   const zip = await new JSZip().loadAsync(arrayBuffer);
   const files = {};
   await Promise.all(Object.keys(zip.files).map(async relativePath => {
@@ -349,10 +351,12 @@ async function load_zip_file(file) {
   return files;
 }
 
-export async function load(file) {
+export async function load(file, show_tips = null) {
   const files = await load_zip_file(file);
+  if (show_tips) show_tips('Parsing files...');
   const set = new BeatmapSet(files);
   set.load_osu_file();
   set.load_osb_file();
+  if (show_tips) show_tips('Finished.');
   return set;
 }

@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title></title>
+  <title>The OSU! StoryBoard player</title>
   <script src="../js/jszip.js"></script>
   <script src="../js/flv.js"></script>
   <style>
@@ -233,7 +233,6 @@
     };
     let breaks = [];
     let videos = [];
-    let next_video_index = 0;
     let audioLeadIn = 0;
 
     const imageFileURLs = {};
@@ -433,7 +432,8 @@
       return div;
     }
 
-    var flv_player = null;
+    let flv_player = null;
+    let next_video_index = 0;
     function updateVideo(time) {
       const video = videos[next_video_index];
       if (next_video_index < videos.length && videos[next_video_index].starttime <= time) {
@@ -448,7 +448,7 @@
         if (video.filename.endsWith('.flv')) {
           flv_player = flvjs.createPlayer({
             type: 'flv',
-            url: URL.createObjectURL(new Blob([files[video.filename]]))
+            url: URL.createObjectURL(new Blob([files[video.filename]])),
           });
           flv_player.attachMediaElement(document.getElementById('Video'));
           flv_player.load();
@@ -558,7 +558,7 @@
     import * as osu from './osu/main.mjs';
 
     async function load_file(file) {
-      const data = await osu.beatmap.load(file);
+      const data = await osu.beatmap.load(file, show_tips);
       const beatmap = data.beatmaps[0];
       const storyboard = data.storyboard;
       files = data.files;
@@ -573,30 +573,29 @@
       initStoryboard(osu.storyboard.combine(beatmap.events, storyboard));
     }
 
-    function show_tips() {
+    function show_tips(stat = null) {
       document.getElementById('hide-it').innerHTML = [
         'Loading...',
         'It is normal to have lag.',
         'Just wait patiently.',
-      ].map(text => `<p>${text}</p>`).join('');
+      ].map(text => `<p>${text}</p>`).join('') +
+        (stat ? `<span style="color: orange;">${stat}</span>` : '');
     }
 
     function load_url(url) {
-      show_tips();
+      show_tips('Receiving file...');
       fetch(url).then(response => response.blob()).then(blob => load_file(blob));
     }
 
     function on_upload(event) {
       const file = event.target.files[0];
       if (!file) return;
-      show_tips();
+      show_tips('Receiving file...');
       load_file(file);
     }
 
-    document.querySelectorAll('.load-button').forEach(button => {
-      button.onclick = function () {
-        load_url(`${this.innerText}.osz`);
-      };
+    document.querySelectorAll('.load-button').forEach(button => button.onclick = function () {
+      load_url(`${this.innerText}.osz`);
     });
 
     document.getElementById('fileInput').addEventListener('change', on_upload);

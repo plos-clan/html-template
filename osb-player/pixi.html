@@ -5,39 +5,278 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>The OSU! StoryBoard player</title>
+  <script src="../js/jszip.js"></script>
+  <script src="../js/flv.js"></script>
   <script src="../js/pixi.js"></script>
+  <script src="../js/pixi-sound.js"></script>
   <style>
     body {
+      position: relative;
+      overflow: hidden;
+
       margin: 0;
       padding: 0;
+      box-sizing: border-box;
+
       width: 100vw;
       height: 100vh;
+
+      background-color: #000;
+    }
+
+    #body {
+      position: relative;
+      --top: 0%;
+      --left: 0%;
+
+      display: none;
       overflow: hidden;
+
+      width: 640px;
+      height: 480px;
+    }
+
+    #BeatmapBackground {
+      display: none;
+    }
+
+    #BeatmapBackground,
+    #Video {
+      position: absolute;
+      top: 0;
+      left: 0;
+      object-fit: contain;
+      width: 100%;
+      height: 100%;
+    }
+
+    #Break {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      opacity: 0;
+      transition: opacity .5s;
+      font-size: 20vh;
+      font-weight: bolder;
+      color: white;
+      text-shadow: 0 0 10px black;
+      user-select: none;
+    }
+
+    #Background,
+    #Fail,
+    #Pass,
+    #Foreground {
+      position: absolute;
+      top: var(--top);
+      left: var(--left);
+
+      width: calc(100% - 2 * var(--left));
+      height: calc(100% - 2 * var(--top));
+    }
+
+    #hide-it {
+      position: absolute;
+      top: 0;
+      left: 0;
+
+      width: 100%;
+      height: 100%;
+
+      padding: 10px;
+
+      user-select: none;
+
+      background-color: #f0f0f0;
+
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+
+      overflow: auto;
+    }
+
+    #hide-it>#text {
+      margin: 1rem;
+      padding: 1rem;
+      background-color: #fffa;
+      border-radius: .5rem;
+      box-shadow: 0 0 1rem rgba(0, 0, 0, 0.1);
+      min-width: 40vw;
+      min-height: 40vh;
+      max-width: 100%;
+      max-width: -moz-available;
+      max-width: -webkit-fill-available;
+      max-width: fill-available;
+    }
+
+    #hide-it>#text>label,
+    #hide-it>#text>button {
+      display: block;
+
+      padding: 10px;
+      margin: 0;
+
+      font-size: large;
+
+      border: 0;
+      border-bottom: 1px solid #5353d6;
+      width: 100%;
+      box-sizing: border-box;
+
+      cursor: default;
+      text-align: center;
+
+      background-color: transparent;
+    }
+
+    #hide-it>#text>label:hover,
+    #hide-it>#text>button:hover {
+      background-color: #f0f0f0;
+    }
+
+    #hide-it>#text>p {
+      font-size: xx-large;
+      padding: 0;
+      margin: 4px;
+      text-align: center;
+    }
+
+    @media (max-width: 40rem) {
+      #hide-it {
+        font-size: .95em;
+        margin: .5rem;
+      }
+    }
+
+    @media (max-width: 36rem) {
+      #hide-it {
+        font-size: .9em;
+      }
+    }
+
+    @media (max-width: 34rem) {
+      #hide-it {
+        padding: .5rem;
+      }
+    }
+
+    @media (max-width: 33rem) {
+      #hide-it {
+        margin: 0;
+      }
+    }
+
+    @media (max-width: 32rem) {
+      #hide-it {
+        font-size: .85em;
+      }
+    }
+
+    @media (max-width: 30rem) {
+      #hide-it {
+        font-size: .8em;
+      }
     }
   </style>
 </head>
 
 <body>
-  <h1>抱歉网页仍在编写中</h1>
-  <script type="module">
-    import * as osu from './osu/main.mjs';
+  <img id="BeatmapBackground" />
+  <video id="Video">
+    <source id="VideoSource">
+  </video>
+  <div id="body">
+    <div id="Break" style="z-index: 327680;">
+      <div style="margin-left: 10vw;">&gt;</div>
+      <div id="break-time"></div>
+      <div style="margin-right: 10vw;">&lt;</div>
+    </div>
+  </div>
+  <div id="hide-it">
+    <main id="title">
+      <h1>The OSU! StoryBoard player</h1>
+    </main>
+    <div id="text">
+      <label for="fileInput">Upload Your .osz File</label>
+      <input type="file" id="fileInput" style="display: none;" />
+      <button class="load-button">43513 Starving Trancer feat. MAKI - only my railgun</button>
+      <button class="load-button">2254087 Zachz Winner - doodle</button>
+      <button class="load-button">2067764 YOASOBI - Yuusha</button>
+      <button class="load-button">29489 Ano Hana Cast - secret base ~Kimi ga Kureta Mono~</button>
+      <button class="load-button">1388906 Raphlesia & BilliumMoto - My Love</button>
+      <button class="load-button">1841885 cYsmix - triangles</button>
+    </div>
+  </div>
+
+  <script>
+    PIXI.sound.disableAutoPause = true;
   </script>
+
   <script type="module">
-    const app = new PIXI.Application();
-    await app.init({ antialias: true, background: '#000', resizeTo: window });
-    document.body.appendChild(app.view);
+    let is_screen_16x9 = false;
+    function resetStoryboardSize() {
+      const div = document.getElementById('body');
+      if (is_screen_16x9) {
+        const scale = Math.min(window.innerWidth / 16, window.innerHeight / 9);
+        div.style.width = 16 * scale + 'px';
+        div.style.height = 9 * scale + 'px';
+        div.style.setProperty('--top', '0%');
+        div.style.setProperty('--left', '12.5%');
+        document.body.style.paddingLeft = (window.innerWidth - 16 * scale) / 2 + 'px';
+        document.body.style.paddingRight = (window.innerWidth - 16 * scale) / 2 + 'px';
+        document.body.style.paddingTop = (window.innerHeight - 9 * scale) / 2 + 'px';
+        document.body.style.paddingBottom = (window.innerHeight - 9 * scale) / 2 + 'px';
+      } else {
+        const scale = Math.min(window.innerWidth / 4, window.innerHeight / 3);
+        div.style.width = 4 * scale + 'px';
+        div.style.height = 3 * scale + 'px';
+        div.style.setProperty('--top', '0%');
+        div.style.setProperty('--left', '0%');
+        document.body.style.paddingLeft = (window.innerWidth - 4 * scale) / 2 + 'px';
+        document.body.style.paddingRight = (window.innerWidth - 4 * scale) / 2 + 'px';
+        document.body.style.paddingTop = (window.innerHeight - 3 * scale) / 2 + 'px';
+        document.body.style.paddingBottom = (window.innerHeight - 3 * scale) / 2 + 'px';
+      }
+      app.renderer.resize(body.clientWidth, body.clientHeight);
+    }
+
+    window.onload = window.onresize = resetStoryboardSize;
+
+    let files = {};
+    let storyboard = [];
+    let storyboard_by_starttime = [];
+    let storyboard_by_endtime = [];
+    let storyboard_elements = {};
+    let playStartTime = 0;
+    let audio = null;
+    const body = document.getElementById('body');
+    const queue = { start: [], stop: [], now: [] };
     const containers = {
-      Background: new PIXI.Container(),
-      Fail: new PIXI.Container(),
-      Pass: new PIXI.Container(),
-      Foreground: new PIXI.Container(),
-      Overlay: new PIXI.Container(),
+      'Background': new PIXI.Container(),
+      'Fail': new PIXI.Container(),
+      'Pass': new PIXI.Container(),
+      'Foreground': new PIXI.Container(),
+      'Overlay': new PIXI.Container(),
     };
+    let breaks = [];
+    let videos = [];
+    let audioLeadIn = 0;
+
     containers.Fail.visible = false;
+
+    const app = new PIXI.Application();
+    await app.init({ antialias: true, backgroundAlpha: 0, transparent: true, resolution: 1 });
+    body.appendChild(app.view);
     app.stage.addChild(...Object.values(containers));
 
     const imageFileURLs = {};
-    // 加载文件
     function getImageFileURL(filepath) {
       if (!imageFileURLs[filepath]) {
         imageFileURLs[filepath] = URL.createObjectURL(new Blob([files[filepath]]));
@@ -45,39 +284,17 @@
       return imageFileURLs[filepath];
     }
 
-    async function loadImage(filepath) {
-      const texture = await Assets.load('https://pixijs.com/assets/bunny.png');
-      PIXI.Loader.shared.add(filepath, getImageFileURL(filepath));
+    const imageAssets = {};
+    function loadImage(filepath) {
+      if (!imageAssets[filepath]) {
+        return PIXI.Assets.load({ src: getImageFileURL(filepath), loadParser: 'loadTextures' }).then(image => {
+          imageAssets[filepath] = image;
+        });
+      }
+      return Promise.resolve();
     }
-
-    class Sprite {
-      origin = [0, 0];
-      animation = [];
-      paths = [];
-      layer = '';
-      commands = []; // OSB commands
-
-      constructor() {
-        this.sprite = new PIXI.Sprite();
-      }
-
-      update(tick) {
-        this.sprite.visible = true;
-        this.sprite.x = 0;
-        this.sprite.y = 0;
-        this.sprite.scale.x = 1;
-        this.sprite.scale.y = 1;
-        this.sprite.rotation = 0;
-        this.sprite.alpha = 1;
-        this.sprite.tint = 0xFFFFFF;
-        this.sprite.blendMode = PIXI.BLEND_MODES.NORMAL;
-        this.sprite.texture = PIXI.Texture.EMPTY;
-        this.sprite.anchor.set(...this.origin);
-        this.sprite.animationSpeed = 1;
-        this.sprite.play();
-        this.sprite.visible = false;
-        containers[this.layer].addChild(this.sprite);
-      }
+    function getImage(filepath) {
+      return imageAssets[filepath];
     }
 
     const anchors = {
@@ -92,38 +309,209 @@
       BottomRight: [1, 1],
     };
 
-    function createSprite(paths, layer, origin) {
-      const textures = paths.map(path => PIXI.Texture.from(path));
+    function load_audio_file(audioFile) {
+      audio = PIXI.sound.Sound.from({
+        url: URL.createObjectURL(new Blob([audioFile])),
+        preload: true,
+      });
+    }
+
+    function createSprite(event) {
+      return new PIXI.Sprite(getImage(event.path));
+    }
+
+    function createAnimatedSprite(event) {
+      const [basename, extname] = event.path.split('.');
+      const paths = Array.from({ length: event.frameCount }, (_, n) => `${basename}${n}.${extname}`);
+      const textures = paths.map(path => getImage(path));
       const sprite = new PIXI.AnimatedSprite(textures);
-      sprite.animationSpeed = 1;
-      sprite.anchor.set(...anchors[origin]);
+      sprite.animationSpeed = (1000 / 60) / event.frameDelay;
       sprite.play();
-      sprite.visible = false;
-      containers[layer].addChild(sprite);
       return sprite;
     }
 
+    function createElement(event) {
+      const sprite = (event.type === 'Sprite' ? createSprite : createAnimatedSprite)(event);
+      sprite.visible = true;
+      sprite.x = event.x;
+      sprite.y = event.y;
+      sprite.scale.x = 1;
+      sprite.scale.y = 1;
+      sprite.rotation = 0;
+      sprite.alpha = 1;
+      sprite.tint = 0xffffff;
+      sprite.blendMode = 'normal';
+      sprite.anchor.set(...anchors[event.origin]);
+      containers[event.layer].addChild(sprite);
+      return sprite;
+    }
 
+    let flv_player = null;
+    let next_video_index = 0;
+    function updateVideo(time) {
+      const video = videos[next_video_index];
+      if (next_video_index < videos.length && videos[next_video_index].starttime <= time) {
+        if (flv_player !== null) {
+          flv_player.unload();
+          flv_player.detachMediaElement();
+          flv_player.destroy();
+          flv_player = null;
+        }
+        const player = document.getElementById('Video');
+        player.currentTime = 0;
+        if (video.filename.endsWith('.flv')) {
+          flv_player = flvjs.createPlayer({
+            type: 'flv',
+            url: URL.createObjectURL(new Blob([files[video.filename]])),
+          });
+          flv_player.attachMediaElement(document.getElementById('Video'));
+          flv_player.load();
+          flv_player.play();
+        } else {
+          const source = document.getElementById('VideoSource');
+          source.src = URL.createObjectURL(new Blob([files[video.filename]]));
+          player.load();
+          player.play();
+        }
+        next_video_index++;
+      }
+    }
 
-    // // 加载纹理
-    // app.loader
-    //   .add('image', 'path/to/your/image.png')
-    //   .add('mask', 'path/to/your/mask.png')
-    //   .load(setup);
+    function updateBreak(time) {
+      let breakend = null;
+      if (time < audioLeadIn) {
+        breakend = audioLeadIn;
+      } else for (const { starttime, endtime } of breaks) {
+        if (endtime < time) continue;
+        if (time < starttime) break;
+        breakend = endtime;
+        break;
+      }
+      if (breakend !== null) {
+        if (breakend - time < 500) {
+          document.getElementById('Break').style.opacity = 0;
+        } else {
+          document.getElementById('Break').style.opacity = 1;
+        }
+        document.getElementById('break-time').innerText = `${((breakend - time) / 1000).toFixed(2)}`;
+      } else {
+        document.getElementById('Break').style.opacity = 0;
+        document.getElementById('break-time').innerText = `0`;
+      }
+    }
 
-    // function setup(loader, resources) {
-    //   // 创建图像精灵
-    //   const image = new PIXI.Sprite(resources.image.texture);
-    //   app.stage.addChild(image);
+    function updateStoryboard() {
+      if (playStartTime < 0) {
+        playStartTime = 0;
+        app.ticker.remove(updateStoryboard);
+        initStoryboard();
+        return;
+      }
+      if (playStartTime === 0) return;
+      const time = performance.now() - playStartTime;
+      while (queue.start.length && queue.start[0].starttime <= time) {
+        const event = queue.start.shift()
+        storyboard_elements[event.id] = [createElement(event), event];
+      }
+      while (queue.stop.length && queue.stop[0].endtime <= time) {
+        const event = queue.stop.shift()
+        storyboard_elements[event.id]?.[0]?.destroy();
+        delete storyboard_elements[event.id];
+      }
+      for (let id in storyboard_elements) {
+        const [element, event] = storyboard_elements[id];
+        const data = event.tick(time);
+        element.x = data.x / 640 * body.clientWidth;
+        element.y = data.y / 480 * body.clientHeight;
+        element.scale.x = data.w / 480 * body.clientHeight;
+        element.scale.y = data.h / 480 * body.clientHeight;
+        element.rotation = data.ro;
+        element.alpha = data.a;
+        element.tint = (Math.floor(data.r * 255) << 16) | (Math.floor(data.g * 255) << 8) | Math.floor(data.b * 255);
+        element.blendMode = data.ma ? 'lighten' : 'normal';
+        // element.scale.x *= data.hr ? -1 : 1;
+        // element.scale.y *= data.vr ? -1 : 1;
+      }
+      updateVideo(time);
+      updateBreak(time);
+    }
 
-    //   // 创建蒙版精灵
-    //   const mask = new PIXI.Sprite(resources.mask.texture);
-    //   app.stage.addChild(mask);
+    function initStoryboard(objects = null) {
+      if (objects !== null) {
+        videos = objects.videos;
+        breaks = objects.breaks;
+        const objs = objects.all.filter(obj => obj.type === 'Sprite' || obj.type === 'Animation');
+        storyboard = objs;
+        storyboard_by_starttime = objs.slice().sort((a, b) => a.starttime - b.starttime);
+        storyboard_by_endtime = objs.slice().sort((a, b) => a.endtime - b.endtime);
+      }
+      for (let element in storyboard_elements) {
+        storyboard_elements[element].remove();
+      }
+      storyboard_elements = {};
+      queue.start = storyboard_by_starttime.slice();
+      queue.stop = storyboard_by_endtime.slice();
+      queue.now = [];
+      storyboard.forEach(event => event.reset());
+      if (document.fullscreenElement === null) document.body.requestFullscreen();
+      app.ticker.add(updateStoryboard);
+      setTimeout(() => audio.play(), audioLeadIn);
+      playStartTime = performance.now();
+    }
 
-    //   // 创建RGB蒙版滤镜
-    //   const maskFilter = new PIXI.filters.SpriteMaskFilter(mask);
-    //   image.filters = [maskFilter];
-    // }
+    import * as osu from './osu/main.mjs';
+
+    async function load_file(file) {
+      const data = await osu.beatmap.load(file, show_tips);
+      const beatmap = data.beatmaps[0];
+      const storyboard = data.storyboard;
+      files = data.files;
+      audioLeadIn = beatmap.general.AudioLeadIn;
+      document.getElementById('hide-it').style.display = 'none';
+      document.getElementById('body').style.display = 'block';
+      is_screen_16x9 = !!beatmap.general.WidescreenStoryboard;
+      resetStoryboardSize();
+      const objects = osu.storyboard.combine(beatmap.events, storyboard);
+      await Promise.all(objects.all.map(event => {
+        if (event.type === 'Sprite') return loadImage(event.path);
+        if (event.type === 'Animation') {
+          const [basename, extname] = event.path.split('.');
+          const paths = Array.from({ length: event.frameCount }, (_, n) => `${basename}${n}.${extname}`);
+          return Promise.all(paths.map(path => loadImage(path)));
+        }
+        return Promise.resolve();
+      }));
+      console.log(imageAssets);
+      load_audio_file(data.files[beatmap.general.AudioFilename]);
+      initStoryboard(objects);
+    }
+
+    function show_tips(stat = null) {
+      document.getElementById('text').innerHTML = [
+        'Loading...',
+        'It is normal to have lag.',
+        'Just wait patiently.',
+      ].map(text => `<p>${text}</p>`).join('') +
+        (stat ? `<p><span style="color: orange;">${stat}</span></p>` : '');
+    }
+
+    function load_url(url) {
+      show_tips('Receiving file...');
+      fetch(url).then(response => response.blob()).then(blob => load_file(blob));
+    }
+
+    function on_upload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      show_tips('Receiving file...');
+      load_file(file);
+    }
+
+    document.querySelectorAll('.load-button').forEach(button => button.onclick = function () {
+      load_url(`${this.innerText}.osz`);
+    });
+
+    document.getElementById('fileInput').addEventListener('change', on_upload);
   </script>
 </body>
 
