@@ -17,6 +17,8 @@ export class Timeline {
   keyframes = []; // 关键帧列表
   index = 0; // 当前关键帧索引
   prevframe = null; // 上一帧
+  starttime = -1;
+  endtime = -1;
 
   // 重置时间
   reset() {
@@ -61,5 +63,7 @@ export class Timeline {
     if (resort_needed) {
       this.keyframes.sort((a, b) => a.time - b.time);
     }
+    this.starttime = this.keyframes[0].time;
+    this.endtime = this.keyframes[this.keyframes.length - 1].time;
   }
 }

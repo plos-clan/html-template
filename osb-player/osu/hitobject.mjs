@@ -8,7 +8,7 @@ class HitSample {
 
   constructor(data) {
     if (data.length === 0) return;
-    data = data.split(':');
+    data = data.split(':').slice(-5);
     this.normal = parseInt(data[0]);
     this.addition = parseInt(data[1]);
     this.index = parseInt(data[2]);
@@ -103,8 +103,7 @@ export class HitObject {
       console.warn('Unknown hit object type');
       this.params = data.slice(5, -1);
     }
-    if (data[data.length - 1] !== '' && data[data.length - 1] !== '0:0:0:0:') {
-      this.hit_sample = new HitSample(data[data.length - 1]);
-    }
+    if (!data[data.length - 1]) data[data.length - 1] = '0:0:0:0:';
+    this.hit_sample = new HitSample(data[data.length - 1]);
   }
 }

@@ -551,7 +551,7 @@
       storyboard.forEach(event => event.reset());
       if (document.fullscreenElement === null) document.body.requestFullscreen();
       requestAnimationFrame(updateStoryboard);
-      setTimeout(() => audio.play(), audioLeadIn);
+      audio.play();
       playStartTime = performance.now();
     }
 
