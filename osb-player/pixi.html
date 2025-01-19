@@ -194,7 +194,7 @@
     <source id="VideoSource">
   </video>
   <div id="body">
-    <div id="Break" style="z-index: 327680;">
+    <div id="Break" style="z-index: 1;">
       <div style="margin-left: 10vw;">&gt;</div>
       <div id="break-time"></div>
       <div style="margin-right: 10vw;">&lt;</div>
@@ -208,7 +208,7 @@
       <label for="fileInput">Upload Your .osz File</label>
       <input type="file" id="fileInput" style="display: none;" />
       <button class="load-button">43513 Starving Trancer feat. MAKI - only my railgun</button>
-      <button class="load-button">2254087 Zachz Winner - doodle</button>
+      <button class="load-button">2253429 Zachz Winner - doodle</button>
       <button class="load-button">2067764 YOASOBI - Yuusha</button>
       <button class="load-button">29489 Ano Hana Cast - secret base ~Kimi ga Kureta Mono~</button>
       <button class="load-button">1388906 Raphlesia & BilliumMoto - My Love</button>
@@ -303,14 +303,17 @@
       'Pass': 131072,
       'Foreground': 196608,
       'Overlay': 262144,
+      // Playfield: 327680,
     };
     let breaks = [];
     let videos = [];
     let audioLeadIn = 0;
     let hitobjects = [];
-    let hitobjects_queue = [];
+    let hitobjects_by_time = [];
+    let hitobject_elements = {};
     let hitsounds = {};
     let enable_hitsounds = get_param('hitsounds') !== 'false';
+    let global_volume = 0.2;
 
     const app = new PIXI.Application();
     await app.init({ antialias: true, backgroundAlpha: 0, transparent: true, resolution: window.devicePixelRatio || 1, useBackBuffer: true });
@@ -397,7 +400,7 @@
       return sprite;
     }
 
-    function createElement(event) {
+    function createStoryboardElement(event) {
       const sprite = (event.type === 'Sprite' ? createSprite : createAnimatedSprite)(event);
       sprite.visible = false;
       sprite.zIndex = event.id + containers_zindex[event.layer];
@@ -412,6 +415,15 @@
       sprite.anchor.set(...anchors[event.origin]);
       app.stage.addChild(sprite);
       return sprite;
+    }
+
+    function createHitojectElement(obj) {
+      const element = new PIXI.Graphics();
+      element.x = (obj.x + 64) / 640 * storyboard_4x3_w + storyboard_4x3_left;
+      element.y = (obj.y + 56) / 480 * storyboard_4x3_h + storyboard_4x3_top;
+      element.zIndex = obj.id + 327680;
+      app.stage.addChild(element);
+      return element;
     }
 
     let flv_player = null;
@@ -468,19 +480,11 @@
       }
     }
 
-    function updateStoryboard() {
-      if (playStartTime < 0) {
-        playStartTime = 0;
-        app.ticker.remove(updateStoryboard);
-        initStoryboard();
-        return;
-      }
-      if (playStartTime === 0) return;
-      const time = performance.now() - playStartTime;
+    function updateStoryboard(time) {
       while (queue.start.length && queue.start[0].starttime <= time + 500) {
         const event = queue.start.shift()
         if (event.layer === 'Fail') continue;
-        storyboard_elements[event.id] = [createElement(event), event];
+        storyboard_elements[event.id] = [createStoryboardElement(event), event];
       }
       while (queue.stop.length && queue.stop[0].endtime <= time) {
         const event = queue.stop.shift()
@@ -512,28 +516,45 @@
           element.y += element.height * (1 - element.anchor.y * 2);
         }
       }
-      updateVideo(time);
-      updateBreak(time);
     }
 
-    function getPromise(obj) {
-      console.log(obj);
-      if (obj && (typeof obj === 'object' || typeof obj === 'function') && typeof obj.then === 'function') {
-        console.log(1);
-        return obj;
-      } else {
-        console.log(2);
-        return Promise.resolve(obj);
+    const hitobject_showtime = 1000;
+    function updateHitoject(time) {
+      for (const obj of hitobjects_by_time) {
+        if (obj.time - time > hitobject_showtime) break;
+        const element = hitobject_elements[obj.id] || (hitobject_elements[obj.id] = createHitojectElement(obj));
+        const t = 1 - (obj.time - time) / hitobject_showtime;
+        element.alpha = t < 0.25 ? t * 4 : 1;
+        const r = storyboard_4x3_h / 30;
+        element.clear();
+        element.circle(0, 0, r * (4 - t * 3) + 6).fill(0x0000ff).circle(0, 0, r * (4 - t * 3) + 3).cut();
+        element.circle(0, 0, r + 3).fill(0xff0000);
+        element.circle(0, 0, r).fill(0xffffff);
       }
+    }
+
+    function updateDisplay() {
+      if (playStartTime < 0) {
+        playStartTime = 0;
+        app.ticker.remove(updateDisplay);
+        initStoryboard();
+        return;
+      }
+      if (playStartTime === 0) return;
+      const time = performance.now() - playStartTime;
+      updateStoryboard(time);
+      updateVideo(time);
+      updateBreak(time);
+      updateHitoject(time);
     }
 
     function updateAudio() {
       const time = performance.now() - playStartTime;
-      while (hitobjects_queue.length && hitobjects_queue[0].time <= time) {
-        const obj = hitobjects_queue.shift();
+      while (hitobjects_by_time.length && hitobjects_by_time[0].time <= time) {
+        const obj = hitobjects_by_time.shift();
         const ss = ['', 'normal', 'soft', 'drum'][obj.hit_sample.normal || 1];
         const idx = (obj.hit_sample.index || 1) - 1 ? `${obj.hit_sample.index || 1}` : '';
-        const vol = (obj.hit_sample.volume / 100 || 1) / 2;
+        const vol = (obj.hit_sample.volume / 100 || 1) * global_volume / 2; // 不然有点响
         const hs = obj.hit_sound || 1;
         if (obj.hit_sample.filename) {
           hitsounds[obj.hit_sample.filename]?.play({ volume: vol });
@@ -543,6 +564,8 @@
         if (hs & 2) hitsounds[`${ss}-hitwhistle${idx}.wav`]?.play({ volume: vol });
         if (hs & 4) hitsounds[`${ss}-hitfinish${idx}.wav`]?.play({ volume: vol });
         if (hs & 8) hitsounds[`${ss}-hitclap${idx}.wav`]?.play({ volume: vol });
+        hitobject_elements[obj.id]?.destroy();
+        delete hitobject_elements[obj.id];
       }
     }
 
@@ -564,11 +587,10 @@
       queue.now = [];
       storyboard.forEach(event => event.reset());
       next_video_index = 0;
-      hitobjects_queue = hitobjects.slice();
-      if (document.fullscreenElement === null) document.body.requestFullscreen();
-      app.ticker.add(updateStoryboard);
+      hitobjects_by_time = hitobjects.slice();
+      app.ticker.add(updateDisplay);
       setInterval(updateAudio, 5);
-      audio.play()
+      audio.play({ volume: global_volume })
         .on('progress', function (value) { playStartTime = performance.now() - value * audio.duration * 1000; })
         .on('end', function () { playStartTime = -1; });
       playStartTime = performance.now();
@@ -586,7 +608,6 @@
 
       const data = await osu.beatmap.load(file, show_tips);
       const beatmap = data.beatmaps[data.beatmaps.length - 1];
-      const storyboard = data.storyboard;
       files = data.files;
       audioLeadIn = beatmap.general.AudioLeadIn;
       hitobjects = beatmap.hit_objects;
@@ -596,7 +617,7 @@
       document.getElementById('hide-it').style.display = 'none';
       document.getElementById('body').style.display = 'block';
 
-      const objects = osu.storyboard.combine(beatmap.events, storyboard);
+      const objects = osu.storyboard.combine(beatmap.events, data.storyboard);
       await Promise.all(objects.all.map(event => {
         if (event.type === 'Sprite') return loadImage(event.path);
         if (event.type === 'Animation') {
@@ -606,9 +627,10 @@
         }
         return Promise.resolve();
       }).concat([
-        load_hitsounds(Object.assign({}, hitsound_files, files)),
+        load_hitsounds({ ...hitsound_files, ...files }),
         load_audio_file(files[beatmap.general.AudioFilename]),
       ]));
+      // if (document.fullscreenElement === null) document.body.requestFullscreen();
       initStoryboard(objects);
     }
 

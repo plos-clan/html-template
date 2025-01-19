@@ -32,8 +32,8 @@ class Type {
     this.spinner = (data & 8) !== 0;
     this.colour_hax = (data & 112) >> 4;
     this.hold = (data & 128) !== 0;
-    if (this.circle && this.slider) {
-      console.warn('Circle and slider at the same time');
+    if (this.circle + this.slider + this.spinner + this.hold !== 1) {
+      console.warn('Invalid hit object type');
     }
   }
 }
@@ -77,6 +77,7 @@ class SpinnerParams {
 }
 
 export class HitObject {
+  id = 0;
   x = 0;
   y = 0;
   time = 0;      // Time when the object is to be hit, in milliseconds from the beginning of the beatmap's audio.

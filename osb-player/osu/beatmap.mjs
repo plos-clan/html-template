@@ -290,9 +290,10 @@ class Beatmap {
     this.metadata = new Metadata(data.Metadata);
     this.difficulty = new Difficulty(data.Difficulty);
     this.events = new Events(data.Events, next_storyboard_event_id);
-    this.timing_points = data.TimingPoints.map(point => new TimingPoint(point));
+    this.timing_points = data.TimingPoints.map(point => new TimingPoint(point)).sort((a, b) => a.time - b.time);
     this.colours = new Colours(data.Colours);
-    this.hit_objects = data.HitObjects.map(object => new HitObject(object));
+    this.hit_objects = data.HitObjects.map(object => new HitObject(object)).sort((a, b) => a.time - b.time);
+    this.hit_objects.forEach((obj, index) => obj.id = index);
   }
 }
 
@@ -309,8 +310,10 @@ class BeatmapSet {
   load_osu_file() {
     for (let name in this.files) if (name.endsWith('.osu')) {
       const beatmap = new Beatmap(new TextDecoder().decode(this.files[name]), this.next_storyboard_event_id);
-      this.beatmaps.push(beatmap);
-      this.next_storyboard_event_id = beatmap.events.next_event_id;
+      if (beatmap.general.Mode === 0) {
+        this.beatmaps.push(beatmap);
+        this.next_storyboard_event_id = beatmap.events.next_event_id;
+      }
     }
     // 目前无法计算难度，使用 OD 代替
     this.beatmaps.sort((a, b) => a.difficulty.OverallDifficulty - b.difficulty.OverallDifficulty);
@@ -320,7 +323,7 @@ class BeatmapSet {
     for (let name in this.files) if (name.endsWith('.osb')) {
       if (this.storyboard !== null) {
         console.warn('Multiple storyboards found in beatmap set, ignoring additional');
-        continue;
+        break;
       }
       const data = parse_file(new TextDecoder().decode(this.files[name]));
       if (Object.keys(data.General).length !== 0
