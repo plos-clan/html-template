@@ -293,7 +293,11 @@ class Beatmap {
     this.timing_points = data.TimingPoints.map(point => new TimingPoint(point)).sort((a, b) => a.time - b.time);
     this.colours = new Colours(data.Colours);
     this.hit_objects = data.HitObjects.map(object => new HitObject(object)).sort((a, b) => a.time - b.time);
-    this.hit_objects.forEach((obj, index) => obj.id = index);
+    this.hit_objects.forEach((obj, index, array) => {
+      obj.id = index;
+      obj.prev = array[index - 1] || null;
+      obj.next = array[index + 1] || null;
+    });
   }
 }
 

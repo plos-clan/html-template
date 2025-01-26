@@ -283,6 +283,8 @@
         app.view.style.width = '100%';
         app.view.style.height = '100%';
       }
+      storyboard_overlay.width = app.screen.width;
+      storyboard_overlay.height = app.screen.height;
     }
 
     window.onload = window.onresize = resetStoryboardSize;
@@ -319,6 +321,13 @@
     await app.init({ antialias: true, backgroundAlpha: 0, transparent: true, resolution: window.devicePixelRatio || 1, useBackBuffer: true });
     body.appendChild(app.view);
 
+    const storyboard_overlay = (new PIXI.Graphics()).rect(0, 0, 1, 1).fill(0);
+    storyboard_overlay.width = app.screen.width;
+    storyboard_overlay.height = app.screen.height;
+    storyboard_overlay.alpha = 0;
+    storyboard_overlay.zIndex = 327680;
+    app.stage.addChild(storyboard_overlay);
+
     const imageFileURLs = {};
     function getImageFileURL(filepath) {
       if (!imageFileURLs[filepath]) {
@@ -351,6 +360,13 @@
       BottomCentre: [0.5, 1],
       BottomRight: [1, 1],
     };
+
+    function colorHex(r, g, b) {
+      r = Math.min(255, Math.max(0, Math.floor(r * 255)));
+      g = Math.min(255, Math.max(0, Math.floor(g * 255)));
+      b = Math.min(255, Math.max(0, Math.floor(b * 255)));
+      return (r << 16) | (g << 8) | b;
+    }
 
     function load_hitsounds(files) {
       const promises = [];
@@ -428,7 +444,10 @@
 
     let flv_player = null;
     let next_video_index = 0;
-    function updateVideo(time) {
+    let video_start_time = -1;
+    const max_video_delay = 30;
+    function updateVideo(time, dt) {
+      const player = document.getElementById('Video');
       const video = videos[next_video_index];
       if (next_video_index < videos.length && videos[next_video_index].starttime <= time) {
         if (flv_player !== null) {
@@ -437,14 +456,14 @@
           flv_player.destroy();
           flv_player = null;
         }
-        const player = document.getElementById('Video');
         player.currentTime = 0;
+        if (files[video.filename] === undefined) return;
         if (video.filename.endsWith('.flv')) {
           flv_player = flvloadImagejs.createPlayer({
             type: 'flv',
             url: URL.createObjectURL(new Blob([files[video.filename]])),
           });
-          flv_player.attachMediaElement(document.getElementById('Video'));
+          flv_player.attachMediaElement(player);
           flv_player.load();
           flv_player.play();
         } else {
@@ -453,14 +472,22 @@
           player.load();
           player.play();
         }
+        player.onended = () => video_start_time = -1;
+        video_start_time = time;
         next_video_index++;
+      }
+      if (video_start_time < 0) return;
+      const delay = (time - video_start_time) - player.currentTime * 1000;
+      if (Math.abs(delay) > max_video_delay) {
+        // console.log(`The video is ${delay}ms behind.`);
+        player.currentTime = (time - video_start_time) / 1000;
       }
     }
 
-    function updateBreak(time) {
+    function updateBreak(time, dt) {
       let breakend = null;
-      if (time < audioLeadIn) {
-        breakend = audioLeadIn;
+      if (time < 0) {
+        breakend = 0;
       } else for (const { starttime, endtime } of breaks) {
         if (endtime < time) continue;
         if (time < starttime) break;
@@ -469,18 +496,21 @@
       }
       if (breakend !== null) {
         if (breakend - time < 500) {
+          if (storyboard_overlay.alpha < 0.1) storyboard_overlay.alpha = Math.min(storyboard_overlay.alpha + dt / 200, 0.1);
           document.getElementById('Break').style.opacity = 0;
         } else {
+          if (storyboard_overlay.alpha > 0) storyboard_overlay.alpha = Math.max(storyboard_overlay.alpha - dt / 200, 0);
           document.getElementById('Break').style.opacity = 1;
         }
         document.getElementById('break-time').innerText = `${((breakend - time) / 1000).toFixed(2)}`;
       } else {
+        if (storyboard_overlay.alpha < 0.1) storyboard_overlay.alpha = 0.1;
         document.getElementById('Break').style.opacity = 0;
         document.getElementById('break-time').innerText = `0`;
       }
     }
 
-    function updateStoryboard(time) {
+    function updateStoryboard(time, dt) {
       while (queue.start.length && queue.start[0].starttime <= time + 500) {
         const event = queue.start.shift()
         if (event.layer === 'Fail') continue;
@@ -491,8 +521,7 @@
         storyboard_elements[event.id]?.[0]?.destroy();
         delete storyboard_elements[event.id];
       }
-      for (let id in storyboard_elements) {
-        const [element, event] = storyboard_elements[id];
+      for (const [element, event] of Object.values(storyboard_elements)) {
         if (time < event.starttime) continue;
         if (!element.visible) {
           element.visible = true;
@@ -504,37 +533,57 @@
         element.scale.x = data.w / 640 * storyboard_4x3_w;
         element.scale.y = data.h / 480 * storyboard_4x3_h;
         element.rotation = data.ro;
-        element.alpha = Math.sqrt(data.a);
-        element.tint = (Math.floor(data.r * 255) << 16) | (Math.floor(data.g * 255) << 8) | Math.floor(data.b * 255);
-        element.blendMode = data.ma ? 'add-npm' : 'normal';
+        element.alpha = Math.sqrt(Math.min(1, Math.max(0, data.a)));
+        element.tint = colorHex(data.r, data.g, data.b);
+        element.blendMode = data.ma ? 'screen' : 'normal';
         if (data.hr) {
           element.scale.x *= -1;
-          element.x += element.width * (1 - element.anchor.x * 2);
+          const d = element.width * (1 - element.anchor.x * 2);
+          element.x += d * Math.cos(data.ro);
+          element.y += d * Math.sin(data.ro);
         }
         if (data.vr) {
           element.scale.y *= -1;
-          element.y += element.height * (1 - element.anchor.y * 2);
+          const d = element.height * (1 - element.anchor.y * 2);
+          element.y += d * Math.cos(data.ro);
+          element.x -= d * Math.sin(data.ro);
         }
       }
     }
 
-    const hitobject_showtime = 1000;
-    function updateHitoject(time) {
+    const hitobject_showtime = 1000; // 打击前的显示时间
+    const hitobject_hidetime = 200; // 打击后的隐藏时间
+    function updateHitoject(time, dt) {
       for (const obj of hitobjects_by_time) {
         if (obj.time - time > hitobject_showtime) break;
-        const element = hitobject_elements[obj.id] || (hitobject_elements[obj.id] = createHitojectElement(obj));
-        const t = 1 - (obj.time - time) / hitobject_showtime;
-        element.alpha = t < 0.25 ? t * 4 : 1;
-        const r = storyboard_4x3_h / 30;
+        if (hitobject_elements[obj.id] !== undefined) continue;
+        hitobject_elements[obj.id] = [createHitojectElement(obj), obj];
+      }
+      for (const [element, obj] of Object.values(hitobject_elements)) {
+        if (time - obj.time < hitobject_hidetime) break;
+        element.destroy();
+        delete hitobject_elements[obj.id];
+      }
+      const r = storyboard_4x3_h / 30;
+      for (const [element, obj] of Object.values(hitobject_elements)) {
         element.clear();
-        element.circle(0, 0, r * (4 - t * 3) + 6).fill(0x0000ff).circle(0, 0, r * (4 - t * 3) + 3).cut();
-        element.circle(0, 0, r + 3).fill(0xff0000);
-        element.circle(0, 0, r).fill(0xffffff);
+        if (time < obj.time) {
+          const t = 1 - (obj.time - time) / hitobject_showtime;
+          element.alpha = t < 0.25 ? t * 4 : 1;
+          element.circle(0, 0, r * (4 - t * 3) + 6).fill(0xffffff, 0.7).circle(0, 0, r * (4 - t * 3) + 3).cut();
+        } else {
+          const t = 1 - (time - obj.time) / hitobject_hidetime;
+          element.alpha = t;
+          element.circle(0, 0, r * (1.6 - t * 0.6) + 6).fill(0xffffff, 0.7).circle(0, 0, r * (1.6 - t * 0.6) + 3).cut();
+        }
+        element.circle(0, 0, r + 3).fill(0xff0000).circle(0, 0, r).cut();
+        element.circle(0, 0, r).fill(0xcccccc);
       }
     }
 
+    let last_display_update_time = 0;
     function updateDisplay() {
-      if (playStartTime < 0) {
+      if (!isFinite(playStartTime)) {
         playStartTime = 0;
         app.ticker.remove(updateDisplay);
         initStoryboard();
@@ -542,10 +591,12 @@
       }
       if (playStartTime === 0) return;
       const time = performance.now() - playStartTime;
-      updateStoryboard(time);
-      updateVideo(time);
-      updateBreak(time);
-      updateHitoject(time);
+      const dt = time - last_display_update_time;
+      updateStoryboard(time, dt);
+      updateVideo(time, dt);
+      updateBreak(time, dt);
+      updateHitoject(time, dt);
+      last_display_update_time = time;
     }
 
     function updateAudio() {
@@ -564,8 +615,6 @@
         if (hs & 2) hitsounds[`${ss}-hitwhistle${idx}.wav`]?.play({ volume: vol });
         if (hs & 4) hitsounds[`${ss}-hitfinish${idx}.wav`]?.play({ volume: vol });
         if (hs & 8) hitsounds[`${ss}-hitclap${idx}.wav`]?.play({ volume: vol });
-        hitobject_elements[obj.id]?.destroy();
-        delete hitobject_elements[obj.id];
       }
     }
 
@@ -578,22 +627,27 @@
         storyboard_by_starttime = objs.slice().sort((a, b) => a.starttime - b.starttime);
         storyboard_by_endtime = objs.slice().sort((a, b) => a.endtime - b.endtime);
       }
-      for (let id in storyboard_elements) {
-        storyboard_elements[id]?.[0]?.destroy();
-      }
+
+      storyboard_overlay.alpha = 0;
+      Object.values(storyboard_elements).forEach(([element]) => element.destroy());
       storyboard_elements = {};
+      Object.values(hitobject_elements).forEach(([element]) => element.destroy());
+      hitobject_elements = {};
+
       queue.start = storyboard_by_starttime.slice();
       queue.stop = storyboard_by_endtime.slice();
       queue.now = [];
+
       storyboard.forEach(event => event.reset());
       next_video_index = 0;
       hitobjects_by_time = hitobjects.slice();
+
       app.ticker.add(updateDisplay);
       setInterval(updateAudio, 5);
       audio.play({ volume: global_volume })
-        .on('progress', function (value) { playStartTime = performance.now() - value * audio.duration * 1000; })
-        .on('end', function () { playStartTime = -1; });
-      playStartTime = performance.now();
+        .on('progress', function (value) { playStartTime = performance.now() - value * audio.duration * 1000 + audioLeadIn; })
+        .on('end', function () { playStartTime = NaN; });
+      playStartTime = performance.now() + audioLeadIn;
     }
 
     import * as osu from './osu/main.mjs';

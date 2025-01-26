@@ -87,6 +87,9 @@ export class HitObject {
   params = null; // Extra parameters specific to the object's type.
   hit_sample = null;
 
+  next = null;
+  prev = null;
+
   constructor(data) {
     data = data.split(',');
     this.x = parseInt(data[0]);

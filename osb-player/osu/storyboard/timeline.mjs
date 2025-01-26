@@ -5,8 +5,8 @@ class KeyFrame {
   constructor(time, value, easing) {
     this.time = time; // 时间
     this.value = value; // 值
-    this.easing = easing < 0 ? undefined : easing_functions[easing]; // 缓动函数
-    if (!(easing < 0) && this.easing === undefined) {
+    this.easing = easing < 0 ? null : easing_functions[easing]; // 缓动函数
+    if (!(easing < 0) && this.easing === null) {
       console.warn(`Unknown easing function: ${easing}`);
       this.easing = x => x;
     }

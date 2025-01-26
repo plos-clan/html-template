@@ -179,11 +179,12 @@
   <div id="hide-it">
     <input type="file" id="fileInput" style="font-size: xx-large;" />
     <button class="load-button">43513 Starving Trancer feat. MAKI - only my railgun</button>
-    <button class="load-button">2254087 Zachz Winner - doodle</button>
+    <button class="load-button">2253429 Zachz Winner - doodle</button>
     <button class="load-button">2067764 YOASOBI - Yuusha</button>
     <button class="load-button">29489 Ano Hana Cast - secret base ~Kimi ga Kureta Mono~</button>
     <button class="load-button">1388906 Raphlesia & BilliumMoto - My Love</button>
     <button class="load-button">1841885 cYsmix - triangles</button>
+    <button class="load-button">2076821 MIMiNARI - Nemurenai feat. Kusunoki Tomori (TV Size)</button>
   </div>
 
   <script type="module">
@@ -595,7 +596,7 @@
     }
 
     document.querySelectorAll('.load-button').forEach(button => button.onclick = function () {
-      load_url(`${this.innerText}.osz`);
+      load_url(`beatmap/${this.innerText}.osz`);
     });
 
     document.getElementById('fileInput').addEventListener('change', on_upload);
