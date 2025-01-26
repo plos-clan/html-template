@@ -290,6 +290,8 @@
     window.onload = window.onresize = resetStoryboardSize;
     window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`).onchange = resetStoryboardSize;
 
+    document.body.ondblclick = () => document.fullscreenElement ? document.exitFullscreen() : document.body.requestFullscreen();
+
     let files = {};
     let storyboard = [];
     let storyboard_by_starttime = [];
@@ -684,7 +686,6 @@
         load_hitsounds({ ...hitsound_files, ...files }),
         load_audio_file(files[beatmap.general.AudioFilename]),
       ]));
-      // if (document.fullscreenElement === null) document.body.requestFullscreen();
       initStoryboard(objects);
     }
 
