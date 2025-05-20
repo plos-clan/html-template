@@ -325,7 +325,7 @@
     let hitobjects_by_time = [];
     let hitobject_elements = {};
     let hitsounds = {};
-    let enable_hitsounds = get_param('hitsounds') !== 'false';
+    let enable_hitsounds = get_param('hitsounds') === 'true';
     let global_volume = 0.2;
 
     const app = new PIXI.Application();
@@ -566,6 +566,7 @@
     const hitobject_showtime = 1000; // 打击前的显示时间
     const hitobject_hidetime = 200; // 打击后的隐藏时间
     function updateHitoject(time, dt) {
+      return;
       for (const obj of hitobjects_by_time) {
         if (obj.time - time > hitobject_showtime) break;
         if (hitobject_elements[obj.id] !== undefined) continue;

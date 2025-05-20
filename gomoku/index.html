@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gomoku Game</title>
+  <script src="../js/tailwindcss.js"></script>
+  <script defer src="../js/alpinejs.js"></script>
+</head>
+
+<body class="bg-gray-100 min-h-screen flex flex-col items-center justify-center p-4">
+  <div class="max-w-lg w-full bg-white rounded-xl shadow-lg p-6" x-data="game()">
+    <h1 class="text-3xl font-bold text-center mb-4">Gomoku (Five in a Row)</h1>
+
+    <div class="mb-4 text-center">
+      <p class="text-lg" x-show="!winner">
+        Current Turn:
+        <span x-show="currentPlayer === 1" class="font-bold">Black</span>
+        <span x-show="currentPlayer === 2" class="font-bold">White</span>
+      </p>
+      <p class="text-xl font-bold text-green-600" x-show="winner">
+        <span x-text="winner === 1 ? 'Black' : 'White'"></span> Wins!
+      </p>
+      <button @click="resetGame()" class="mt-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition">
+        Reset Game
+      </button>
+    </div>
+
+    <!-- Game board -->
+    <div class="bg-yellow-100 border border-yellow-800 rounded-lg overflow-hidden">
+      <div class="grid grid-cols-15 gap-0">
+        <template x-for="(row, rowIndex) in board" :key="rowIndex">
+          <template x-for="(cell, colIndex) in row" :key="colIndex">
+            <div @click="makeMove(rowIndex, colIndex)"
+              class="w-6 h-6 sm:w-8 sm:h-8 relative flex items-center justify-center"
+              :class="{'cursor-pointer hover:bg-yellow-200': !cell && !winner, 'cursor-not-allowed': cell || winner}">
+              <div class="absolute w-full h-0.5 bg-yellow-800"></div>
+              <div class="absolute h-full w-0.5 bg-yellow-800"></div>
+              <div x-show="cell === 1" class="absolute w-5/6 h-5/6 rounded-full bg-black border-2 border-gray-600">
+              </div>
+              <div x-show="cell === 2" class="absolute w-5/6 h-5/6 rounded-full bg-white border-2 border-gray-300">
+              </div>
+            </div>
+          </template>
+        </template>
+      </div>
+    </div>
+
+    <div class="mt-4 text-sm text-gray-600 text-center">
+      <p>Place 5 stones in a row (horizontally, vertically, or diagonally) to win!</p>
+    </div>
+  </div>
+
+  <script>
+    function game() {
+      return {
+        board: Array(15).fill().map(() => Array(15).fill(0)),
+        currentPlayer: 1, // 1 for black, 2 for white
+        winner: null,
+
+        makeMove(row, col) {
+          if (this.board[row][col] !== 0 || this.winner) {
+            return;
+          }
+
+          this.board[row][col] = this.currentPlayer;
+
+          // Check for win
+          if (this.checkWin(row, col)) {
+            this.winner = this.currentPlayer;
+            return;
+          }
+
+          this.currentPlayer = this.currentPlayer === 1 ? 2 : 1;
+        },
+
+        checkWin(row, col) {
+          const directions = [
+            [0, 1],   // horizontal
+            [1, 0],   // vertical
+            [1, 1],   // diagonal down-right
+            [1, -1]   // diagonal down-left
+          ];
+
+          const player = this.board[row][col];
+
+          for (const [dx, dy] of directions) {
+            let count = 1;
+
+            // Check in positive direction
+            for (let i = 1; i < 5; i++) {
+              const newRow = row + i * dx;
+              const newCol = col + i * dy;
+
+              if (
+                newRow >= 0 && newRow < 15 &&
+                newCol >= 0 && newCol < 15 &&
+                this.board[newRow][newCol] === player
+              ) {
+                count++;
+              } else {
+                break;
+              }
+            }
+
+            // Check in negative direction
+            for (let i = 1; i < 5; i++) {
+              const newRow = row - i * dx;
+              const newCol = col - i * dy;
+
+              if (
+                newRow >= 0 && newRow < 15 &&
+                newCol >= 0 && newCol < 15 &&
+                this.board[newRow][newCol] === player
+              ) {
+                count++;
+              } else {
+                break;
+              }
+            }
+
+            if (count >= 5) {
+              return true;
+            }
+          }
+
+          return false;
+        },
+
+        resetGame() {
+          this.board = Array(15).fill().map(() => Array(15).fill(0));
+          this.currentPlayer = 1;
+          this.winner = null;
+        }
+      };
+    }
+  </script>
+
+  <style>
+    .grid-cols-15 {
+      grid-template-columns: repeat(15, minmax(0, 1fr));
+    }
+  </style>
+</body>
+
+</html>
