@@ -4,9 +4,52 @@
 <head>
   <meta charset="UTF-8">
   <title>ZXing 二维码扫描记录系统</title>
-  <script type="text/javascript" src="https://unpkg.com/@zxing/browser@latest"></script>
-  <script type="module">
-    // 添加全局变量来存储已扫描的二维码内容
+  <script src="https://unpkg.com/@zxing/browser@latest"></script>
+  <style>
+    body {
+      font-family: Arial;
+      text-align: center;
+      padding: 20px;
+    }
+
+    #video {
+      width: 100%;
+      max-width: 400px;
+      border: 2px solid #ccc;
+    }
+
+    table {
+      width: 100%;
+      margin-top: 20px;
+      border-collapse: collapse;
+    }
+
+    th,
+    td {
+      border: 1px solid #ccc;
+      padding: 8px;
+    }
+
+    th {
+      background: #f5f5f5;
+    }
+  </style>
+</head>
+
+<body>
+  <h2>ZXing 二维码扫描与拍照记录</h2>
+
+  <video id="video" playsinline muted></video>
+
+  <table id="results">
+    <tr>
+      <th>时间</th>
+      <th>二维码内容</th>
+      <th>截图</th>
+    </tr>
+  </table>
+
+  <script>
     const scannedResults = new Set();
 
     const codeReader = new ZXingBrowser.BrowserMultiFormatReader();
@@ -47,7 +90,6 @@
     }
 
     function captureAndLogResult(qrText) {
-      // 若已扫描过该二维码，则忽略重复内容
       if (scannedResults.has(qrText)) return;
       scannedResults.add(qrText);
 
@@ -58,7 +100,7 @@
       context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
       const dataUrl = canvas.toDataURL('image/png');
 
-      const row = resultsTable.insertRow(1); // 新记录插入最上面
+      const row = resultsTable.insertRow(1);
       const cellTime = row.insertCell(0);
       const cellText = row.insertCell(1);
       const cellImage = row.insertCell(2);
@@ -69,51 +111,8 @@
       cellImage.innerHTML = `<img src="${dataUrl}" style="max-height: 80px; border:1px solid #ccc;" />`;
     }
 
-    window.addEventListener('DOMContentLoaded', startCameraAndScan);
+    startCameraAndScan();
   </script>
-
-  <style>
-    body {
-      font-family: Arial;
-      text-align: center;
-      padding: 20px;
-    }
-
-    #video {
-      width: 100%;
-      max-width: 400px;
-      border: 2px solid #ccc;
-    }
-
-    table {
-      width: 100%;
-      margin-top: 20px;
-      border-collapse: collapse;
-    }
-
-    th,
-    td {
-      border: 1px solid #ccc;
-      padding: 8px;
-    }
-
-    th {
-      background: #f5f5f5;
-    }
-  </style>
-</head>
-
-<body>
-  <h2>ZXing 二维码扫描与拍照记录</h2>
-  <video id="video" playsinline muted></video>
-
-  <table id="results">
-    <tr>
-      <th>时间</th>
-      <th>二维码内容</th>
-      <th>截图</th>
-    </tr>
-  </table>
 </body>
 
 </html>
