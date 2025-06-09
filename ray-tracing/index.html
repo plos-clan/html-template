@@ -1,0 +1,1014 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ray Tracing</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+    }
+
+    #background {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -1;
+    }
+
+    #text {
+      position: absolute;
+      top: 0;
+      left: 0;
+      padding: 20px;
+      font-size: 24px;
+      color: #3745ff;
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="background"></canvas>
+  <canvas id="textCanvas" style="display:none;"></canvas>
+  <div id="text">Ray Tracing Example</div>
+  <script>
+    class Color {
+      // RGBA 颜色
+      //     0 - 1 范围
+      constructor(r, g, b, a = 1) {
+        this.r = r;
+        this.g = g;
+        this.b = b;
+        this.a = a;
+      }
+
+      scale(scalar) {
+        return new Color(
+          this.r * scalar,
+          this.g * scalar,
+          this.b * scalar,
+          this.a * scalar,
+        );
+      }
+
+      add(color) {
+        return new Color(
+          this.r + color.r,
+          this.g + color.g,
+          this.b + color.b,
+          this.a + color.a,
+        );
+      }
+
+      mul(color) {
+        return new Color(
+          this.r * color.r,
+          this.g * color.g,
+          this.b * color.b,
+          this.a * color.a,
+        );
+      }
+
+      static byte(r, g, b, a = 255) {
+        return new Color(
+          r / 255,
+          g / 255,
+          b / 255,
+          a / 255
+        );
+      }
+
+      toString() {
+        return `rgba(${this.r}, ${this.g}, ${this.b}, ${this.a / 255})`;
+      }
+    };
+  </script>
+  <script>
+    class Vector {
+      constructor(x, y, z) {
+        this.x = x; // X component
+        this.y = y; // Y component
+        this.z = z; // Z component
+      }
+
+      add(v) {
+        return new Vector(this.x + v.x, this.y + v.y, this.z + v.z);
+      }
+
+      subtract(v) {
+        return new Vector(this.x - v.x, this.y - v.y, this.z - v.z);
+      }
+
+      dot(v) {
+        return this.x * v.x + this.y * v.y + this.z * v.z;
+      }
+
+      scale(s) {
+        return new Vector(this.x * s, this.y * s, this.z * s);
+      }
+
+      get length() {
+        return Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z);
+      }
+
+      get normalized() {
+        const len = this.length;
+        if (len === 0) return new Vector(0, 0, 0);
+        return new Vector(this.x / len, this.y / len, this.z / len);
+      }
+
+      cross(v) {
+        return new Vector(
+          this.y * v.z - this.z * v.y,
+          this.z * v.x - this.x * v.z,
+          this.x * v.y - this.y * v.x
+        );
+      }
+    };
+
+    class Matrix {
+      constructor(elements) {
+        this.elements = elements; // 4x4 matrix represented as a flat array
+      }
+
+      static identity() {
+        return new Matrix(new Float32Array([
+          1, 0, 0, 0,
+          0, 1, 0, 0,
+          0, 0, 1, 0,
+          0, 0, 0, 1,
+        ]));
+      }
+
+      multiplyVector(v) {
+        // Placeholder for matrix-vector multiplication
+        return new Vector(0, 0, 0);
+      }
+    };
+  </script>
+  <script>
+    class ImageTexture {
+      constructor(imageUrl) {
+        this.image = new Image();
+        this.data = null;
+        this.width = 0;
+        this.height = 0;
+
+        this.emissive = false;
+        this.dimensions = 2;
+        this.loaded = false;
+
+        // 加载图像
+        this.image.onload = () => {
+          this.width = this.image.width;
+          this.height = this.image.height;
+
+          // 创建离屏canvas来访问像素数据
+          const canvas = document.createElement('canvas');
+          canvas.width = this.width;
+          canvas.height = this.height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(this.image, 0, 0);
+
+          // 获取像素数据
+          const imageData = ctx.getImageData(0, 0, this.width, this.height);
+          this.data = imageData.data;
+          this.loaded = true;
+        };
+
+        this.image.src = imageUrl;
+      }
+
+      // 通过UV坐标获取颜色
+      getColor(u, v) {
+        if (!this.loaded) return new Color(0, 0, 0);
+
+        // 确保UV坐标在0-1范围内
+        u = Math.max(0, Math.min(1, u));
+        v = Math.max(0, Math.min(1, v));
+
+        // 转换为图像坐标
+        const x = Math.floor(u * (this.width - 1));
+        const y = Math.floor((1 - v) * (this.height - 1)); // 注意图像y轴是从上到下的
+
+        // 计算像素在数组中的位置
+        const index = (y * this.width + x) * 4;
+
+        // 将 0-255 范围的颜色转换为 0-1 范围
+        return new Color(
+          this.data[index] / 255,      // R
+          this.data[index + 1] / 255,  // G
+          this.data[index + 2] / 255,  // B
+          this.data[index + 3] / 255   // A
+        );
+      }
+
+      getIntensity(u, v) {
+        return new Color(0, 0, 0);
+      }
+    }
+
+    class CheckerTexture {
+      constructor(color1, color2, scale = 1) {
+        this.color1 = color1;
+        this.color2 = color2;
+        this.scale = scale;
+
+        this.emissive = false;
+        this.dimensions = 2;
+        this.loaded = true;
+      }
+
+      getColor(u, v) {
+        const scaledU = u / this.scale;
+        const scaledV = v / this.scale;
+        const isEven = (Math.floor(scaledU) + Math.floor(scaledV)) % 2 === 0;
+        return isEven ? this.color1 : this.color2;
+      }
+
+      getIntensity(u, v) {
+        return new Color(0, 0, 0);
+      }
+    }
+
+    class SolidColorTexture {
+      constructor(color) {
+        this.color = color;
+
+        this.emissive = false;
+        this.dimensions = 0;
+        this.loaded = true;
+      }
+
+      getColor() {
+        return this.color;
+      }
+
+      getIntensity() {
+        return new Color(0, 0, 0);
+      }
+    }
+
+    class LightTexture {
+      constructor(color, intensity) {
+        this.color = color;
+        this.intensity = color.mul(intensity);
+
+        this.emissive = true;
+        this.dimensions = 0;
+        this.loaded = true;
+      }
+
+      getColor() {
+        return this.color;
+      }
+
+      getIntensity() {
+        return this.intensity;
+      }
+    }
+  </script>
+  <script>
+    class PlaneObject {
+      // point: 平面的 (0,0) 点
+      // point1: 平面的 (0,1) 点，用于计算纹理坐标
+      //      point1 若不在平面上，则会被映射到平面上
+      constructor(normal, point, point1, texture) {
+        this.normal = normal.normalized;
+        this.center = point;
+        this.point = point;
+        const d1 = this.normal.dot(point1.subtract(point));
+        const p1 = point1.subtract(this.normal.scale(d1));
+        this.uAxis = p1.subtract(point).normalized;
+        this.vAxis = this.normal.cross(this.uAxis).normalized;
+        this.texture = texture;
+      }
+
+      // 平面上到指定点最近的一个点
+      closestTo(point) {
+        const toPoint = point.subtract(this.point);
+        const distance = this.normal.dot(toPoint);
+        return point.subtract(this.normal.scale(distance));
+      }
+
+      // 获取光线和平面的交点
+      // ro: ray origin (Vector)
+      // rd: ray direction (Vector)
+      // 返回交点位置(t)，没有交点则返回 +Inf
+      intersect(ray) {
+        const ro = ray.origin;
+        const rd = ray.direction;
+        const d = rd.dot(this.normal);
+
+        if (Math.abs(d) < 1e-6) {
+          return Infinity; // 平行于平面，无交点
+        }
+
+        const t = this.normal.dot(this.point.subtract(ro)) / d;
+        return t >= 0 ? t : Infinity; // 返回正的交点
+      }
+
+      getNormal(point) {
+        return this.normal;
+      }
+
+      // 获取交点的纹理坐标
+      getUV(point) {
+        const localPoint = point.subtract(this.point);
+        const u = localPoint.dot(this.uAxis);
+        const v = localPoint.dot(this.vAxis);
+        return { u, v };
+      }
+
+      // 获取交点的纹理颜色
+      getColorAt(point) {
+        if (this.texture.dimensions === 0) {
+          return this.texture.getColor();
+        } else if (this.texture.dimensions === 1) {
+          const { u, v } = this.getUV(point);
+          return this.texture.getColor(u);
+        } else if (this.texture.dimensions === 2) {
+          const { u, v } = this.getUV(point);
+          return this.texture.getColor(u, v);
+        } else {
+          return new Color(0, 0, 0);
+        }
+      }
+
+      getIntensityAt(point) {
+        if (this.texture.dimensions === 0) {
+          return this.texture.getIntensity();
+        } else if (this.texture.dimensions === 1) {
+          const { u, v } = this.getUV(point);
+          return this.texture.getIntensity(u);
+        } else if (this.texture.dimensions === 2) {
+          const { u, v } = this.getUV(point);
+          return this.texture.getIntensity(u, v);
+        } else {
+          return new Color(0, 0, 0);
+        }
+      }
+    };
+
+    class SphereObject {
+      constructor(center, radius, texture) {
+        this.center = center;
+        this.radius = radius;
+        this.texture = texture;
+      }
+
+      // 球体上到指定点最近的一个点
+      //     指定点在球体外部
+      closestTo(point) {
+        const direction = point.subtract(this.center).normalized;
+        return this.center.add(direction.scale(this.radius));
+      }
+
+      // 获取光线和球体的交点
+      // ro: ray origin (Vector)
+      // rd: ray direction (Vector)
+      // p = ro + t * rd
+      // 返回交点位置(t)，没有交点则返回 +Inf
+      intersect(ray) {
+        const r = this.radius;
+        const ro = ray.origin;
+        const rd = ray.direction;
+        const oc = ro.subtract(this.center);
+
+        const a = rd.dot(rd);
+        const b = 2 * oc.dot(rd);
+        const c = oc.dot(oc) - r * r;
+        const d = b * b - 4 * a * c;
+
+        if (d < 0) {
+          return Infinity;
+        } else {
+          const t1 = (-b - Math.sqrt(d)) / (2 * a);
+          const t2 = (-b + Math.sqrt(d)) / (2 * a);
+          return t1 >= 0 ? t1 : t2 >= 0 ? t2 : Infinity; // 返回最小的正交点
+        }
+      }
+
+      getNormal(point) {
+        return point.subtract(this.center).normalized;
+      }
+
+      // 获取交点的纹理坐标
+      getUV(point) {
+        // 将点转换为相对于球体中心的坐标
+        const localPoint = point.subtract(this.center);
+        // 计算球面坐标
+        const phi = Math.atan2(localPoint.z, localPoint.x);
+        const theta = Math.acos(localPoint.y / this.radius);
+
+        // 转换为UV坐标 (0-1范围)
+        const u = 1 - (phi + Math.PI) / (2 * Math.PI);
+        const v = (theta) / Math.PI;
+
+        return { u, v };
+      }
+
+      // 获取交点的纹理颜色
+      getColorAt(point) {
+        if (this.texture.dimensions === 0) {
+          return this.texture.getColor();
+        } else if (this.texture.dimensions === 1) {
+          const { u, v } = this.getUV(point);
+          return this.texture.getColor(u);
+        } else if (this.texture.dimensions === 2) {
+          const { u, v } = this.getUV(point);
+          return this.texture.getColor(u, v);
+        } else {
+          return new Color(0, 0, 0);
+        }
+      }
+
+      getIntensityAt(point) {
+        if (this.texture.dimensions === 0) {
+          return this.texture.getIntensity();
+        } else if (this.texture.dimensions === 1) {
+          const { u, v } = this.getUV(point);
+          return this.texture.getIntensity(u);
+        } else if (this.texture.dimensions === 2) {
+          const { u, v } = this.getUV(point);
+          return this.texture.getIntensity(u, v);
+        } else {
+          return new Color(0, 0, 0);
+        }
+      }
+    };
+  </script>
+  <script>
+    class Ray {
+      constructor(origin, direction) {
+        this.origin = origin; // { x: 0, y: 0, z: 0 }
+        this.direction = direction; // { x: 0, y: 0, z: -1 }
+      }
+
+      getPointAt(t) {
+        return new Vector(
+          this.origin.x + this.direction.x * t,
+          this.origin.y + this.direction.y * t,
+          this.origin.z + this.direction.z * t
+        );
+      }
+    };
+
+    class Camera {
+      constructor(position, direction, fov) {
+        this.position = position; // { x: 0, y: 0, z: 0 }
+        this.direction = direction; // { x: 0, y: 0, z: -1 }
+        this.fov = fov; // Field of view in degrees
+
+        // 计算相机坐标系
+        this.updateCameraCoordinateSystem();
+      }
+
+      // 更新相机坐标系
+      updateCameraCoordinateSystem() {
+        // 定义世界上方向
+        const worldUp = new Vector(0, 1, 0);
+
+        // 计算相机右侧向量 (camera right)
+        this.right = this.direction.cross(worldUp).normalized;
+
+        // 如果相机方向与世界上方向平行，需要特殊处理
+        if (this.right.length < 0.001) {
+          // 选择一个垂直于方向的向量
+          if (Math.abs(this.direction.x) < 0.9) {
+            this.right = new Vector(1, 0, 0);
+          } else {
+            this.right = new Vector(0, 0, 1);
+          }
+        }
+
+        // 计算相机上方向 (camera up)
+        this.up = this.right.cross(this.direction).normalized;
+      }
+
+      // 更新相机方向
+      lookAt(target) {
+        this.direction = target.subtract(this.position).normalized;
+        this.updateCameraCoordinateSystem();
+      }
+
+      // 旋转相机
+      rotate(yaw, pitch) {
+        // 先绕世界Y轴旋转（偏航角）
+        const worldUp = new Vector(0, 1, 0);
+        this.direction = rotateVectorAroundAxis(this.direction, worldUp, yaw);
+
+        // 再绕局部右轴旋转（俯仰角）
+        this.updateCameraCoordinateSystem(); // 更新右轴
+        this.direction = rotateVectorAroundAxis(this.direction, this.right, pitch);
+
+        // 确保方向向量是单位向量
+        this.direction = this.direction.normalized;
+
+        // 更新相机坐标系
+        this.updateCameraCoordinateSystem();
+      }
+
+      genRays(screenWidth, screenHeight) {
+        const aspectRatio = screenWidth / screenHeight;
+        const scale = Math.tan((this.fov * Math.PI) / 360);
+        const rays = [];
+
+        // 确保坐标系是最新的
+        this.updateCameraCoordinateSystem();
+
+        for (let y = 0; y < screenHeight; y++) {
+          for (let x = 0; x < screenWidth; x++) {
+            // 计算在视平面上的坐标 (-1到1的范围)
+            const ndcX = (2 * (x + 0.5) / screenWidth - 1) * aspectRatio * scale;
+            const ndcY = (1 - 2 * (y + 0.5) / screenHeight) * scale;
+
+            // 使用相机坐标系计算射线方向
+            const rayDirection = this.direction.add(
+              this.right.scale(ndcX).add(
+                this.up.scale(ndcY)
+              )
+            ).normalized;
+
+            rays.push({
+              x: x,
+              y: y,
+              ray: new Ray(this.position, rayDirection),
+            });
+          }
+        }
+        return rays;
+      }
+    };
+
+    class Screen {
+      constructor(width, height, canvas) {
+        this.width = width;
+        this.height = height;
+        this.canvas = canvas;
+        this.canvas.width = width;
+        this.canvas.height = height;
+        this.ctx = this.canvas.getContext('2d');
+        this.buf = new Float32Array(width * height * 4); // RGBA buffer
+        this.backgroundColor = new Color(0, 0, 0);
+      }
+
+      drawPixel(x, y, color) {
+        this.buf[(y * this.width + x) * 4 + 0] = color.r;
+        this.buf[(y * this.width + x) * 4 + 1] = color.g;
+        this.buf[(y * this.width + x) * 4 + 2] = color.b;
+        this.buf[(y * this.width + x) * 4 + 3] = color.a;
+      }
+
+      flush() {
+        const valuesAboveOne = this.buf.map(value => value > 1 ? (value - 1) * 2 : 0);
+        const valuesBelowOne = this.buf.map(value => value <= 1 ? value : 1);
+        {
+          const tmp = new Float32Array(valuesAboveOne.length);
+          const blurred = new Float32Array(valuesAboveOne.length);
+
+          const kernel1D = [1, 2, 1];
+          const kernelSum1D = 4;
+
+          for (let y = 0; y < this.height; y++) {
+            for (let x = 0; x < this.width; x++) {
+              const index = (y * this.width + x) * 4;
+              if (x === 0 || x === this.width - 1) {
+                for (let c = 0; c < 4; c++) {
+                  tmp[index + c] = valuesAboveOne[index + c];
+                }
+              } else {
+                for (let c = 0; c < 4; c++) {
+                  let sum = 0;
+                  for (let kx = -1; kx <= 1; kx++) {
+                    const k = kernel1D[kx + 1];
+                    const idx = (y * this.width + (x + kx)) * 4 + c;
+                    sum += valuesAboveOne[idx] * k;
+                  }
+                  tmp[index + c] = sum / kernelSum1D;
+                }
+              }
+            }
+          }
+
+          for (let y = 0; y < this.height; y++) {
+            for (let x = 0; x < this.width; x++) {
+              const index = (y * this.width + x) * 4;
+              if (y === 0 || y === this.height - 1) {
+                for (let c = 0; c < 4; c++) {
+                  blurred[index + c] = tmp[index + c];
+                }
+              } else {
+                for (let c = 0; c < 4; c++) {
+                  let sum = 0;
+                  for (let ky = -1; ky <= 1; ky++) {
+                    const k = kernel1D[ky + 1];
+                    const idx = ((y + ky) * this.width + x) * 4 + c;
+                    sum += tmp[idx] * k;
+                  }
+                  blurred[index + c] = sum / kernelSum1D;
+                }
+              }
+            }
+          }
+
+          for (let i = 0; i < this.buf.length; i++) {
+            this.buf[i] = blurred[i] + valuesBelowOne[i];
+          }
+        }
+        const imageData = new ImageData(new Uint8ClampedArray(this.buf.map(c => Math.floor(c * 255))), this.width, this.height);
+        this.ctx.putImageData(imageData, 0, 0);
+      }
+
+      getCanvas() {
+        return this.canvas;
+      }
+    };
+
+    class World {
+      objects = null;
+      lights = null;
+
+      constructor() {
+        this.objects = [];
+        this.lights = [];
+      }
+
+      addObject(object) {
+        this.objects.push(object);
+        if (object.texture.emissive) {
+          this.lights.push(object);
+        }
+      }
+
+      getClosestObject(ray) {
+        let closestT = Infinity;
+        let closestObject = null;
+
+        for (const object of this.objects) {
+          const t = object.intersect(ray);
+          if (t < closestT) {
+            closestT = t;
+            closestObject = object;
+          }
+        }
+
+        return { closestObject, closestT };
+      }
+
+      // 检查从point到destination的路径是否被阻挡
+      isOccluded(point, destination) {
+        const direction = destination.subtract(point).normalized;
+        const distanceToDestination = destination.subtract(point).length;
+        const ray = new Ray(point, direction);
+
+        // 添加一个小的偏移量以避免自相交
+        ray.origin = ray.getPointAt(0.001);
+
+        for (const object of this.objects) {
+          const t = object.intersect(ray);
+          if (t > 0 && t < distanceToDestination - 0.002) {
+            return true;
+          }
+        }
+
+        return false;
+      }
+
+      render(screen, camera) {
+        console.log(`Rendering world with ${this.objects.length} objects and ${this.lights.length} lights.`);
+
+        const rays = camera.genRays(screen.width, screen.height);
+
+        for (let i = 0; i < rays.length; i++) {
+          const { x, y, ray } = rays[i];
+          let { closestObject, closestT } = this.getClosestObject(ray);
+
+          if (closestObject !== null) {
+            const intersectionPoint = ray.getPointAt(closestT);
+            const color = closestObject.getColorAt(intersectionPoint);
+            const normal = closestObject.getNormal(intersectionPoint);
+
+            let finalColor = new Color(0, 0, 0);
+            for (const light of this.lights) {
+              const lightPoint = light.closestTo(intersectionPoint);
+              if (light === closestObject) {
+                finalColor = finalColor.add(light.getIntensityAt(lightPoint));
+                continue;
+              }
+              if (!this.isOccluded(intersectionPoint, lightPoint)) {
+                const lightDirection = lightPoint.subtract(intersectionPoint).normalized;
+                const cosAngle = Math.max(0, normal.dot(lightDirection));
+                const distanceToLight = lightPoint.subtract(intersectionPoint).length + 1;
+                const distanceAttenuation = 1 / (distanceToLight * distanceToLight);
+                finalColor = finalColor.add(light.getIntensityAt(lightPoint).mul(color).scale(cosAngle * distanceAttenuation));
+              }
+            }
+
+            screen.drawPixel(x, y, finalColor);
+          } else {
+            screen.drawPixel(x, y, screen.backgroundColor);
+          }
+        }
+
+        screen.flush();
+      }
+    };
+  </script>
+  <script>
+    const canvas = document.getElementById('background');
+    const screen = new Screen(window.innerWidth / 4, window.innerHeight / 4, canvas);
+
+    const camera = new Camera(new Vector(0, 0, 5), new Vector(0, 0, -1), 60);
+    const world = new World();
+
+    // 添加平面
+    world.addObject(new PlaneObject(new Vector(0, 1, 0), new Vector(0, -1, 0), new Vector(1, -1, 0), new CheckerTexture(Color.byte(180, 180, 180), Color.byte(200, 200, 200))));
+
+    // 添加球体
+    world.addObject(new SphereObject(new Vector(0, 0, -1), 0.5, new CheckerTexture(Color.byte(255, 255, 255), Color.byte(100, 100, 100), scale = 0.1)));
+
+    // 添加光源
+    world.addObject(new SphereObject(new Vector(2, 2, 0), 0.1, new LightTexture(Color.byte(240, 240, 255), new Color(3, 3, 3))));
+
+    // 添加光源
+    world.addObject(new SphereObject(new Vector(-2, 2, 0), 0.1, new LightTexture(Color.byte(255, 240, 240), new Color(3, 3, 3))));
+
+    // 添加光源
+    world.addObject(new SphereObject(new Vector(0, 1, 0), 0.2, new LightTexture(Color.byte(192, 128, 255), new Color(0.3, 0.3, 0.3))));
+
+    // 渲染世界
+    world.render(screen, camera);
+  </script>
+  <script>
+    document.addEventListener('keydown', (event) => {
+      const key = event.key.toLowerCase();
+      keysPressed[key] = true;
+
+      // 如果还没有启动相机移动循环，则启动
+      if (!isMoving) {
+        isMoving = true;
+        requestAnimationFrame(moveCamera);
+      }
+    });
+
+    document.addEventListener('keyup', (event) => {
+      const key = event.key.toLowerCase();
+      keysPressed[key] = false;
+    });
+
+    // 跟踪按下的键
+    const keysPressed = {};
+    let isMoving = false;
+
+    // 添加相机角度跟踪
+    const cameraAngles = {
+      yaw: Math.PI,    // 水平旋转角度（绕Y轴）
+      pitch: 0   // 垂直旋转角度（绕X轴）
+    };
+
+    // 相机移动函数
+    function moveCamera() {
+      let moved = false;
+      const moveSpeed = 0.05; // 移动速度
+      const rotateSpeed = 0.03; // 旋转速度
+      const worldUp = new Vector(0, 1, 0);
+
+      // 旋转控制 - 先处理旋转，这样移动时可以使用更新后的方向
+      if (keysPressed['arrowup']) {
+        // 向上看 - 增加pitch角度
+        cameraAngles.pitch = Math.min(cameraAngles.pitch + rotateSpeed, Math.PI / 2 - 0.01);
+        moved = true;
+      }
+      if (keysPressed['arrowdown']) {
+        // 向下看 - 减少pitch角度
+        cameraAngles.pitch = Math.max(cameraAngles.pitch - rotateSpeed, -Math.PI / 2 + 0.01);
+        moved = true;
+      }
+      if (keysPressed['arrowleft']) {
+        // 向左看 - 增加yaw角度
+        cameraAngles.yaw += rotateSpeed;
+        moved = true;
+      }
+      if (keysPressed['arrowright']) {
+        // 向右看 - 减少yaw角度
+        cameraAngles.yaw -= rotateSpeed;
+        moved = true;
+      }
+
+      // 根据角度更新相机方向
+      if (moved) {
+        // 计算新的方向向量
+        const cosPitch = Math.cos(cameraAngles.pitch);
+        const sinPitch = Math.sin(cameraAngles.pitch);
+        const cosYaw = Math.cos(cameraAngles.yaw);
+        const sinYaw = Math.sin(cameraAngles.yaw);
+
+        // 根据欧拉角计算前向方向
+        camera.direction = new Vector(
+          cosPitch * sinYaw,
+          sinPitch,
+          cosPitch * cosYaw
+        ).normalized;
+
+        // 更新相机坐标系
+        camera.updateCameraCoordinateSystem();
+      }
+
+      // 计算移动方向 - 始终使用水平方向（忽略Y分量）
+      const horizontalDirection = new Vector(
+        Math.sin(cameraAngles.yaw),
+        0,
+        Math.cos(cameraAngles.yaw)
+      ).normalized;
+
+      // 计算右方向 - 始终垂直于水平前进方向和世界上方向
+      const right = horizontalDirection.cross(worldUp).normalized;
+
+      // 平移控制
+      if (keysPressed['w']) {
+        camera.position = camera.position.add(horizontalDirection.scale(moveSpeed));
+        moved = true;
+      }
+      if (keysPressed['s']) {
+        camera.position = camera.position.subtract(horizontalDirection.scale(moveSpeed));
+        moved = true;
+      }
+      if (keysPressed['a']) {
+        camera.position = camera.position.subtract(right.scale(moveSpeed));
+        moved = true;
+      }
+      if (keysPressed['d']) {
+        camera.position = camera.position.add(right.scale(moveSpeed));
+        moved = true;
+      }
+      if (keysPressed[' ']) {
+        camera.position = camera.position.add(worldUp.scale(moveSpeed));
+        moved = true;
+      }
+      if (keysPressed['shift']) {
+        camera.position = camera.position.subtract(worldUp.scale(moveSpeed));
+        moved = true;
+      }
+
+      // 如果有移动，重新渲染场景
+      if (moved) {
+        world.render(screen, camera);
+      }
+
+      // 如果还有按下的键，继续移动循环
+      if (Object.values(keysPressed).some(value => value)) {
+        requestAnimationFrame(moveCamera);
+      } else {
+        isMoving = false;
+      }
+    } 
+  </script>
+  <script>
+    // function getTextBitmap(text, size = 16) {
+    //   const canvas = document.getElementById('textCanvas');
+    //   const ctx = canvas.getContext('2d');
+    //   ctx.font = `${size}px sans-serif`;
+    //   const textMetrics = ctx.measureText(text);
+    //   const width = Math.ceil(textMetrics.width);
+    //   const height = Math.ceil(textMetrics.actualBoundingBoxAscent + textMetrics.actualBoundingBoxDescent);
+    //   canvas.width = width;
+    //   canvas.height = height;
+    //   ctx.font = `${size}px sans-serif`;
+    //   ctx.fillStyle = 'black';
+    //   ctx.fillText(text, 0, textMetrics.actualBoundingBoxAscent);
+    //   const data = ctx.getImageData(0, 0, width, height).data;
+    //   const output = new Float32Array(width * height);
+    //   for (let i = 0; i < data.length / 4; i++) {
+    //     output[i] = data[i * 4 + 3] / 255;
+    //   }
+    //   return { output, width, height };
+    // }
+  </script>
+  <script>
+    // const canvas = document.getElementById('background');
+    // const color_bg = { r: 27, g: 95, b: 220 };
+    // const color_fg = { r: 95, g: 251, b: 241 };
+    // const set_canvas = (function (canvas) {
+    //   let width, height;
+    //   let depth, speed;
+    //   let img, ctx, aid;
+    //   function points_of_line(x0, y0, x1, y1) {
+    //     const points = [];
+    //     const dx = Math.abs(x1 - x0);
+    //     const dy = Math.abs(y1 - y0);
+    //     const sx = (x0 < x1) ? 1 : -1;
+    //     const sy = (y0 < y1) ? 1 : -1;
+    //     let err = dx - dy;
+    //     while (true) {
+    //       points.push({ x: x0, y: y0 });
+    //       if (x0 === x1 && y0 === y1) break;
+    //       let e2 = 2 * err;
+    //       if (e2 > -dy) err -= dy, x0 += sx;
+    //       if (e2 < dx) err += dx, y0 += sy;
+    //     }
+    //     points.pop();
+    //     return points;
+    //   }
+    //   function calc() {
+    //     for (let y = 1; y < height - 1; y++) {
+    //       for (let x = 1; x < width - 1; x++) {
+    //         const i = x + y * width;
+    //         const dd1 = depth[i - 1] + depth[i + 1] + depth[i - width] + depth[i + width];
+    //         const dd2 = depth[i - 1 - width] + depth[i + 1 - width] + depth[i - 1 + width] + depth[i + 1 + width];
+    //         speed[i] += dd1 + dd2 * .7072 - depth[i] * 6.8289;
+    //       }
+    //     }
+    //     for (let i = 0; i < width; i++) {
+    //       depth[i] *= .984375;
+    //     }
+    //     for (let i = 0; i < width; i++) {
+    //       depth[(height - 1) * width + i] *= .984375;
+    //     }
+    //     for (let i = 0; i < height; i++) {
+    //       depth[i * width] *= .984375;
+    //     }
+    //     for (let i = 0; i < height; i++) {
+    //       depth[i * width + width - 1] *= .984375;
+    //     }
+    //     for (let i = 1; i < width * height - 1; i++) {
+    //       depth[i] = depth[i] * .984375 + speed[i] * .125;
+    //     }
+    //   }
+    //   function draw() {
+    //     for (let i = 1; i < width * height - 1; i++) {
+    //       const k = depth[i] < -1 ? 0 : depth[i] > 1 ? 1 : depth[i] / 2 + .5;
+    //       img.data[i * 4] = color_fg.r * k + color_bg.r * (1 - k);
+    //       img.data[i * 4 + 1] = color_fg.g * k + color_bg.g * (1 - k);
+    //       img.data[i * 4 + 2] = color_fg.b * k + color_bg.b * (1 - k);
+    //       img.data[i * 4 + 3] = 255;
+    //     }
+    //     ctx.putImageData(img, 0, 0);
+    //   }
+    //   function disturb(x, y) {
+    //     const i = x + y * width;
+    //     depth[i] += 1;
+    //     if (x - 1 > 0) depth[i - 1] += 1;
+    //     if (x + 1 < width) depth[i + 1] += 1;
+    //     if (y - 1 > 0) depth[i - width] += 1;
+    //     if (y + 1 < height) depth[i + width] += 1;
+    //   }
+    //   function fill_text(text, size = 16, k = 1) {
+    //     const { output, width: text_width, height: text_height } = getTextBitmap(text, size);
+    //     const dx = Math.floor((width - text_width) / 2), dy = Math.floor((height - text_height) / 2);
+    //     for (let y = 0; y < text_height; y++) {
+    //       for (let x = 0; x < text_width; x++) {
+    //         const i = (x + dx) + (y + dy) * width;
+    //         depth[i] += output[x + y * text_width] * k;
+    //       }
+    //     }
+    //   }
+    //   function animate() {
+    //     if (Math.random() < .5) disturb(Math.floor(Math.random() * width), Math.floor(Math.random() * height));
+    //     calc();
+    //     draw();
+    //     aid = requestAnimationFrame(animate);
+    //   }
+    //   function callback(e) {
+    //     const { offsetX, offsetY } = e;
+    //     const { movementX, movementY } = e;
+    //     const oldX = offsetX - movementX;
+    //     const oldY = offsetY - movementY;
+    //     const points = points_of_line(oldX, oldY, offsetX, offsetY);
+    //     points.forEach(p => depth[p.x + p.y * width] += 1);
+    //   }
+    //   return function (canvas) {
+    //     ctx = canvas.getContext('2d');
+    //     canvas.width = window.innerWidth;
+    //     canvas.height = window.innerHeight;
+    //     width = canvas.width;
+    //     height = canvas.height;
+    //     depth = new Float32Array(width * height);
+    //     speed = new Float32Array(width * height);
+    //     img = ctx.createImageData(width, height);
+    //     aid = requestAnimationFrame(animate);
+    //     canvas.addEventListener('mousemove', callback);
+    //     return {
+    //       fill_text, cancel: function () {
+    //         canvas.removeEventListener('mousemove', callback);
+    //         cancelAnimationFrame(aid);
+    //       }
+    //     };
+    //   };
+    // })();
+    // let { fill_text, cancel } = set_canvas(canvas);
+    // window.addEventListener('resize', () => {
+    //   cancel();
+    //   let { _fill_text, _cancel } = set_canvas(canvas);
+    //   fill_text = _fill_text, cancel = _cancel;
+    // });
+    // setTimeout(() => fill_text('Welcome to plos-clan!', 128), 1000);
+    // setTimeout(() => fill_text('欢迎来到 plos-clan！', 128), 5000); 
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>高级二维码扫描器</title>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .scanner-section {
+            display: flex;
+            gap: 30px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .camera-container {
+            flex: 1;
+            min-width: 300px;
+            position: relative;
+        }
+
+        #videoElement {
+            width: 100%;
+            max-width: 500px;
+            height: auto;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .canvas-container {
+            flex: 1;
+            min-width: 300px;
+        }
+
+        .processing-canvas {
+            border: 2px solid #ddd;
+            border-radius: 15px;
+            max-width: 100%;
+            height: auto;
+            margin-bottom: 15px;
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 30px;
+            justify-content: center;
+        }
+
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 25px;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 7px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .file-label {
+            display: inline-block;
+            padding: 12px 24px;
+            background: linear-gradient(45deg, #28a745, #20c997);
+            color: white;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .file-label:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 7px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .settings {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+        }
+
+        .setting-group {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        .setting-group label {
+            font-weight: bold;
+            color: #333;
+            min-width: 120px;
+        }
+
+        input[type="range"] {
+            flex: 1;
+            min-width: 150px;
+        }
+
+        input[type="number"] {
+            width: 80px;
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        .result {
+            background: #e8f5e8;
+            border: 2px solid #28a745;
+            border-radius: 15px;
+            padding: 20px;
+            margin-top: 20px;
+            word-break: break-all;
+        }
+
+        .result h3 {
+            color: #28a745;
+            margin-bottom: 10px;
+        }
+
+        .error {
+            background: #f8d7da;
+            border: 2px solid #dc3545;
+            color: #721c24;
+        }
+
+        .error h3 {
+            color: #dc3545;
+        }
+
+        .status {
+            text-align: center;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 10px;
+            font-weight: bold;
+        }
+
+        .status.scanning {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .status.processing {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .scan-region {
+            position: absolute;
+            border: 3px solid #28a745;
+            border-radius: 10px;
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.3);
+        }
+
+        @media (max-width: 768px) {
+            .scanner-section {
+                flex-direction: column;
+            }
+
+            .controls {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .setting-group {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🔍 高级二维码扫描器</h1>
+
+        <div class="settings">
+            <h3>图像处理设置</h3>
+            <div class="setting-group">
+                <label>亮度调节:</label>
+                <input type="range" id="brightness" min="0" max="200" value="100">
+                <input type="number" id="brightnessValue" min="0" max="200" value="100">
+            </div>
+            <div class="setting-group">
+                <label>对比度调节:</label>
+                <input type="range" id="contrast" min="0" max="300" value="100">
+                <input type="number" id="contrastValue" min="0" max="300" value="100">
+            </div>
+            <div class="setting-group">
+                <label>锐化强度:</label>
+                <input type="range" id="sharpen" min="0" max="100" value="0">
+                <input type="number" id="sharpenValue" min="0" max="100" value="0">
+            </div>
+            <div class="setting-group">
+                <label>二值化阈值:</label>
+                <input type="range" id="threshold" min="0" max="255" value="128">
+                <input type="number" id="thresholdValue" min="0" max="255" value="128">
+            </div>
+        </div>
+
+        <div class="controls">
+            <button id="startBtn">📹 开始扫描</button>
+            <button id="stopBtn" disabled>⏹️ 停止扫描</button>
+            <button id="captureBtn" disabled>📸 拍照扫描</button>
+            <label for="fileInput" class="file-label">📁 选择图片</label>
+            <input type="file" id="fileInput" class="file-input" accept="image/*">
+        </div>
+
+        <div id="status" class="status"></div>
+
+        <div class="scanner-section">
+            <div class="camera-container">
+                <video id="videoElement" autoplay muted playsinline></video>
+                <canvas id="overlay" class="overlay"></canvas>
+            </div>
+            <div class="canvas-container">
+                <h3>处理后的图像:</h3>
+                <canvas id="processedCanvas" class="processing-canvas"></canvas>
+                <canvas id="binaryCanvas" class="processing-canvas"></canvas>
+            </div>
+        </div>
+
+        <div id="result"></div>
+    </div>
+
+    <script>
+        class AdvancedQRScanner {
+            constructor() {
+                this.video = document.getElementById('videoElement');
+                this.processedCanvas = document.getElementById('processedCanvas');
+                this.binaryCanvas = document.getElementById('binaryCanvas');
+                this.overlay = document.getElementById('overlay');
+                this.isScanning = false;
+                this.stream = null;
+
+                this.initializeElements();
+                this.bindEvents();
+            }
+
+            initializeElements() {
+                this.startBtn = document.getElementById('startBtn');
+                this.stopBtn = document.getElementById('stopBtn');
+                this.captureBtn = document.getElementById('captureBtn');
+                this.fileInput = document.getElementById('fileInput');
+                this.status = document.getElementById('status');
+                this.result = document.getElementById('result');
+
+                // 设置控制元素
+                this.brightnessSlider = document.getElementById('brightness');
+                this.contrastSlider = document.getElementById('contrast');
+                this.sharpenSlider = document.getElementById('sharpen');
+                this.thresholdSlider = document.getElementById('threshold');
+
+                this.brightnessValue = document.getElementById('brightnessValue');
+                this.contrastValue = document.getElementById('contrastValue');
+                this.sharpenValue = document.getElementById('sharpenValue');
+                this.thresholdValue = document.getElementById('thresholdValue');
+            }
+
+            bindEvents() {
+                this.startBtn.addEventListener('click', () => this.startScanning());
+                this.stopBtn.addEventListener('click', () => this.stopScanning());
+                this.captureBtn.addEventListener('click', () => this.captureAndScan());
+                this.fileInput.addEventListener('change', (e) => this.handleFileUpload(e));
+
+                // 绑定滑块事件
+                this.bindSlider(this.brightnessSlider, this.brightnessValue);
+                this.bindSlider(this.contrastSlider, this.contrastValue);
+                this.bindSlider(this.sharpenSlider, this.sharpenValue);
+                this.bindSlider(this.thresholdSlider, this.thresholdValue);
+            }
+
+            bindSlider(slider, valueInput) {
+                slider.addEventListener('input', () => {
+                    valueInput.value = slider.value;
+                    if (this.isScanning) this.processFrame();
+                });
+
+                valueInput.addEventListener('input', () => {
+                    slider.value = valueInput.value;
+                    if (this.isScanning) this.processFrame();
+                });
+            }
+
+            async startScanning() {
+                try {
+                    this.stream = await navigator.mediaDevices.getUserMedia({
+                        video: {
+                            facingMode: 'environment',
+                            width: { ideal: 1280 },
+                            height: { ideal: 720 }
+                        }
+                    });
+
+                    this.video.srcObject = this.stream;
+                    this.isScanning = true;
+
+                    this.startBtn.disabled = true;
+                    this.stopBtn.disabled = false;
+                    this.captureBtn.disabled = false;
+
+                    this.updateStatus('正在扫描...', 'scanning');
+
+                    this.video.addEventListener('loadedmetadata', () => {
+                        this.setupCanvases();
+                        this.scanLoop();
+                    });
+
+                } catch (error) {
+                    this.showError('无法访问摄像头: ' + error.message);
+                }
+            }
+
+            stopScanning() {
+                this.isScanning = false;
+
+                if (this.stream) {
+                    this.stream.getTracks().forEach(track => track.stop());
+                    this.stream = null;
+                }
+
+                this.startBtn.disabled = false;
+                this.stopBtn.disabled = true;
+                this.captureBtn.disabled = true;
+
+                this.updateStatus('已停止扫描', '');
+            }
+
+            setupCanvases() {
+                const rect = this.video.getBoundingClientRect();
+
+                // 设置处理画布
+                this.processedCanvas.width = this.video.videoWidth;
+                this.processedCanvas.height = this.video.videoHeight;
+
+                this.binaryCanvas.width = this.video.videoWidth;
+                this.binaryCanvas.height = this.video.videoHeight;
+
+                // 设置覆盖层
+                this.overlay.width = rect.width;
+                this.overlay.height = rect.height;
+            }
+
+            scanLoop() {
+                if (!this.isScanning) return;
+
+                this.processFrame();
+                requestAnimationFrame(() => this.scanLoop());
+            }
+
+            processFrame() {
+                if (!this.video.videoWidth || !this.video.videoHeight) return;
+
+                const canvas = document.createElement('canvas');
+                canvas.width = this.video.videoWidth;
+                canvas.height = this.video.videoHeight;
+                const ctx = canvas.getContext('2d');
+
+                // 绘制原始视频帧
+                ctx.drawImage(this.video, 0, 0);
+
+                // 获取图像数据
+                let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+                // 应用图像处理
+                imageData = this.enhanceImage(imageData);
+
+                // 显示处理后的图像
+                const processedCtx = this.processedCanvas.getContext('2d');
+                processedCtx.putImageData(imageData, 0, 0);
+
+                // 创建二值化版本
+                const binaryImageData = this.binarizeImage(imageData);
+                const binaryCtx = this.binaryCanvas.getContext('2d');
+                binaryCtx.putImageData(binaryImageData, 0, 0);
+
+                // 尝试扫描两个版本
+                this.attemptScan(imageData) || this.attemptScan(binaryImageData);
+            }
+
+            enhanceImage(imageData) {
+                const data = imageData.data;
+                const brightness = parseInt(this.brightnessSlider.value);
+                const contrast = parseInt(this.contrastSlider.value);
+                const sharpen = parseInt(this.sharpenSlider.value);
+
+                // 亮度和对比度调整
+                const brightnessFactor = brightness / 100;
+                const contrastFactor = contrast / 100;
+
+                for (let i = 0; i < data.length; i += 4) {
+                    // 应用亮度
+                    data[i] *= brightnessFactor;     // Red
+                    data[i + 1] *= brightnessFactor; // Green
+                    data[i + 2] *= brightnessFactor; // Blue
+
+                    // 应用对比度
+                    data[i] = ((data[i] - 128) * contrastFactor) + 128;
+                    data[i + 1] = ((data[i + 1] - 128) * contrastFactor) + 128;
+                    data[i + 2] = ((data[i + 2] - 128) * contrastFactor) + 128;
+
+                    // 限制值范围
+                    data[i] = Math.max(0, Math.min(255, data[i]));
+                    data[i + 1] = Math.max(0, Math.min(255, data[i + 1]));
+                    data[i + 2] = Math.max(0, Math.min(255, data[i + 2]));
+                }
+
+                // 应用锐化
+                if (sharpen > 0) {
+                    return this.applySharpen(imageData, sharpen / 100);
+                }
+
+                return imageData;
+            }
+
+            applySharpen(imageData, strength) {
+                const data = imageData.data;
+                const width = imageData.width;
+                const height = imageData.height;
+                const newData = new Uint8ClampedArray(data);
+
+                // 锐化核
+                const kernel = [
+                    0, -strength, 0,
+                    -strength, 1 + 4 * strength, -strength,
+                    0, -strength, 0
+                ];
+
+                for (let y = 1; y < height - 1; y++) {
+                    for (let x = 1; x < width - 1; x++) {
+                        for (let c = 0; c < 3; c++) {
+                            let sum = 0;
+                            for (let ky = -1; ky <= 1; ky++) {
+                                for (let kx = -1; kx <= 1; kx++) {
+                                    const idx = ((y + ky) * width + (x + kx)) * 4 + c;
+                                    sum += data[idx] * kernel[(ky + 1) * 3 + (kx + 1)];
+                                }
+                            }
+                            const idx = (y * width + x) * 4 + c;
+                            newData[idx] = Math.max(0, Math.min(255, sum));
+                        }
+                    }
+                }
+
+                return new ImageData(newData, width, height);
+            }
+
+            binarizeImage(imageData) {
+                const data = new Uint8ClampedArray(imageData.data);
+                const threshold = parseInt(this.thresholdSlider.value);
+
+                for (let i = 0; i < data.length; i += 4) {
+                    const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+                    const binary = gray > threshold ? 255 : 0;
+
+                    data[i] = binary;     // Red
+                    data[i + 1] = binary; // Green
+                    data[i + 2] = binary; // Blue
+                }
+
+                return new ImageData(data, imageData.width, imageData.height);
+            }
+
+            attemptScan(imageData) {
+                try {
+                    const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                        inversionAttempts: "dontInvert",
+                    });
+
+                    if (code) {
+                        this.showResult(code);
+                        this.drawScanRegion(code.location);
+                        return true;
+                    }
+                } catch (error) {
+                    console.log('扫描尝试失败:', error);
+                }
+                return false;
+            }
+
+            drawScanRegion(location) {
+                const overlayCtx = this.overlay.getContext('2d');
+                overlayCtx.clearRect(0, 0, this.overlay.width, this.overlay.height);
+
+                const scaleX = this.overlay.width / this.video.videoWidth;
+                const scaleY = this.overlay.height / this.video.videoHeight;
+
+                overlayCtx.strokeStyle = '#28a745';
+                overlayCtx.lineWidth = 3;
+                overlayCtx.beginPath();
+                overlayCtx.moveTo(location.topLeftCorner.x * scaleX, location.topLeftCorner.y * scaleY);
+                overlayCtx.lineTo(location.topRightCorner.x * scaleX, location.topRightCorner.y * scaleY);
+                overlayCtx.lineTo(location.bottomRightCorner.x * scaleX, location.bottomRightCorner.y * scaleY);
+                overlayCtx.lineTo(location.bottomLeftCorner.x * scaleX, location.bottomLeftCorner.y * scaleY);
+                overlayCtx.closePath();
+                overlayCtx.stroke();
+            }
+
+            captureAndScan() {
+                this.updateStatus('正在处理图像...', 'processing');
+                setTimeout(() => {
+                    this.processFrame();
+                }, 100);
+            }
+
+            handleFileUpload(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                this.updateStatus('正在处理上传的图片...', 'processing');
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        this.processUploadedImage(img);
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+
+            processUploadedImage(img) {
+                // 设置画布尺寸并绘制图像
+                this.processedCanvas.width = img.width;
+                this.processedCanvas.height = img.height;
+                this.binaryCanvas.width = img.width;
+                this.binaryCanvas.height = img.height;
+
+                const ctx = this.processedCanvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+
+                // 获取图像数据并处理
+                let imageData = ctx.getImageData(0, 0, img.width, img.height);
+
+                // 尝试多种处理方式
+                const results = this.tryMultipleEnhancements(imageData);
+
+                if (results.length > 0) {
+                    this.showResult(results[0]);
+                } else {
+                    this.showError('未能识别二维码，请尝试调整图像处理参数');
+                }
+            }
+
+            tryMultipleEnhancements(originalImageData) {
+                const results = [];
+
+                // 保存原始设置
+                const originalSettings = {
+                    brightness: this.brightnessSlider.value,
+                    contrast: this.contrastSlider.value,
+                    sharpen: this.sharpenSlider.value,
+                    threshold: this.thresholdSlider.value
+                };
+
+                // 尝试多种参数组合
+                const testSettings = [
+                    { brightness: 100, contrast: 150, sharpen: 30, threshold: 128 },
+                    { brightness: 120, contrast: 200, sharpen: 50, threshold: 100 },
+                    { brightness: 80, contrast: 120, sharpen: 20, threshold: 160 },
+                    { brightness: 150, contrast: 180, sharpen: 40, threshold: 140 },
+                    { brightness: 100, contrast: 100, sharpen: 0, threshold: 128 }
+                ];
+
+                for (const settings of testSettings) {
+                    // 应用测试设置
+                    this.brightnessSlider.value = settings.brightness;
+                    this.contrastSlider.value = settings.contrast;
+                    this.sharpenSlider.value = settings.sharpen;
+                    this.thresholdSlider.value = settings.threshold;
+
+                    // 处理图像
+                    let processedData = this.enhanceImage(new ImageData(
+                        new Uint8ClampedArray(originalImageData.data),
+                        originalImageData.width,
+                        originalImageData.height
+                    ));
+
+                    // 尝试扫描
+                    try {
+                        const code = jsQR(processedData.data, processedData.width, processedData.height, {
+                            inversionAttempts: "attemptBoth",
+                        });
+
+                        if (code) {
+                            results.push(code);
+                            // 显示成功的处理结果
+                            const processedCtx = this.processedCanvas.getContext('2d');
+                            processedCtx.putImageData(processedData, 0, 0);
+
+                            const binaryData = this.binarizeImage(processedData);
+                            const binaryCtx = this.binaryCanvas.getContext('2d');
+                            binaryCtx.putImageData(binaryData, 0, 0);
+                            break;
+                        }
+                    } catch (error) {
+                        console.log('扫描尝试失败:', error);
+                    }
+                }
+
+                // 恢复原始设置
+                this.brightnessSlider.value = originalSettings.brightness;
+                this.contrastSlider.value = originalSettings.contrast;
+                this.sharpenSlider.value = originalSettings.sharpen;
+                this.thresholdSlider.value = originalSettings.threshold;
+
+                return results;
+            }
+
+            showResult(code) {
+                this.result.innerHTML = `
+                    <div class="result">
+                        <h3>✅ 扫描成功！</h3>
+                        <p><strong>内容:</strong> ${code.data}</p>
+                        <p><strong>格式:</strong> ${code.format || 'QR Code'}</p>
+                        <p><strong>位置:</strong> (${Math.round(code.location.topLeftCorner.x)}, ${Math.round(code.location.topLeftCorner.y)})</p>
+                    </div>
+                `;
+                this.updateStatus('扫描成功！', '');
+            }
+
+            showError(message) {
+                this.result.innerHTML = `
+                    <div class="result error">
+                        <h3>❌ 错误</h3>
+                        <p>${message}</p>
+                    </div>
+                `;
+                this.updateStatus('扫描失败', '');
+            }
+
+            updateStatus(message, className) {
+                this.status.textContent = message;
+                this.status.className = 'status ' + className;
+            }
+        }
+
+        // 初始化扫描器
+        document.addEventListener('DOMContentLoaded', () => {
+            new AdvancedQRScanner();
+        });
+    </script>
+</body>
+
+</html>
