@@ -680,8 +680,6 @@
       }
 
       render(screen, camera) {
-        console.log(`Rendering world with ${this.objects.length} objects and ${this.lights.length} lights.`);
-
         const rays = camera.genRays(screen.width, screen.height);
 
         for (let i = 0; i < rays.length; i++) {

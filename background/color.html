@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Color</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+      transition: background-color 0.3s ease;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+    }
+
+    .container {
+      text-align: center;
+      background: rgba(255, 255, 255, 0.9);
+      padding: 15px 30px;
+      border-radius: 10px;
+      box-shadow: 4px 4px 8px 4px rgba(0, 0, 0, 0.1);
+      opacity: 0.9;
+    }
+
+    pre {
+      font-size: xx-large;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <pre id="color">#ffffff</pre>
+  </div>
+
+  <script>
+    function setBackgroundColor() {
+      let colorHash = window.location.hash.substring(1);
+      const colorRegex = /^[0-9A-Fa-f]{6}$/;
+      if (colorRegex.test(colorHash)) {
+        const color = '#' + colorHash;
+        document.body.style.backgroundColor = color;
+        document.getElementById('color').textContent = color;
+      } else {
+        document.body.style.backgroundColor = '#ffffff';
+      }
+    }
+    setBackgroundColor();
+    window.addEventListener('hashchange', setBackgroundColor);
+  </script>
+</body>
+
+</html>
