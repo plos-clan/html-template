@@ -7,85 +7,301 @@
   <title>Color</title>
   <style>
     body {
-      margin: 0;
-      padding: 0;
-      font-family: Arial, sans-serif;
+      overflow: hidden;
+
       width: 100vw;
       height: 100vh;
-      overflow: hidden;
+      margin: 0;
+      padding: 0;
+
+      user-select: none;
+
       background-color: #aaa;
       background-image:
         linear-gradient(45deg, #ccc 25%, transparent 25%),
         linear-gradient(-45deg, #ccc 25%, transparent 25%),
         linear-gradient(45deg, transparent 75%, #ccc 75%),
         linear-gradient(-45deg, transparent 75%, #ccc 75%);
-      background-size: 20px 20px;
       background-position: 0 0, 0 10px, 10px -10px, -10px 0;
-      user-select: none;
+      background-size: 20px 20px;
+
+      font-family: Arial, sans-serif;
+    }
+
+    body {
+      --now-r: 0;
+      --now-g: 0;
+      --now-b: 0;
+      --now-a: 0;
+    }
+
+    body[data-theme="light"] {
+      --r-color: #c00;
+      --g-color: #070;
+      --b-color: #33f;
+      --a-color: #555;
+    }
+
+    body[data-theme="dark"] {
+      --r-color: #f55;
+      --g-color: #0a0;
+      --b-color: #88f;
+      --a-color: #aaa;
     }
 
     #body {
-      margin: 0;
-      padding: 0;
-      transition: background-color 0.3s ease;
+      display: flex;
+      overflow: hidden;
+      align-items: center;
+      justify-content: center;
+
       width: 100vw;
       height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      overflow: hidden;
+      margin: 0;
+      padding: 0;
+
+      transition: background-color 0.3s ease;
     }
 
     #container {
-      text-align: center;
       padding: 15px 30px;
+
+      transition: background-color 0.3s ease;
+      text-align: center;
+
       border-radius: 10px;
       box-shadow: 4px 4px 8px 4px rgba(0, 0, 0, 0.1);
-      transition: background-color 0.3s ease;
+
       backdrop-filter: blur(2px);
     }
 
     #color {
-      font-size: xx-large;
-      color: #333333;
-      font-weight: bold;
       margin: 0;
       padding: 0;
-      opacity: 0;
+
       transition: opacity 0.3s ease;
+
+      opacity: 0;
+      color: #333;
+
+      font-size: xx-large;
+      font-weight: bold;
+    }
+
+    #color>:nth-child(1) {
+      color: var(--r-color);
+    }
+
+    #color>:nth-child(2) {
+      color: var(--g-color);
+    }
+
+    #color>:nth-child(3) {
+      color: var(--b-color);
+    }
+
+    #color>:nth-child(4) {
+      color: var(--a-color);
+    }
+
+    .color-slider-container {
+      font-size: large;
+    }
+
+    .color-slider:nth-child(1) {
+      color: var(--r-color);
+    }
+
+    .color-slider:nth-child(2) {
+      color: var(--g-color);
+    }
+
+    .color-slider:nth-child(3) {
+      color: var(--b-color);
+    }
+
+    .color-slider:nth-child(4) {
+      color: var(--a-color);
+    }
+  </style>
+  <style>
+    .color-slider {
+      display: block;
+
+      margin: 3px;
+    }
+
+    input[type="range"] {
+      width: 200px;
+      height: 8px;
+      margin: 5px 0;
+
+      border-radius: 4px;
+      outline: none;
+      background: #ddd;
+
+      -webkit-appearance: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      width: 20px;
+      height: 20px;
+
+      cursor: pointer;
+
+      border: 2px solid #fff;
+      border-radius: 50%;
+      background: #333;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+
+      -webkit-appearance: none;
+      appearance: none;
+    }
+
+    input[type="range"]::-moz-range-track {
+      width: 100%;
+      height: 8px;
+
+      cursor: pointer;
+
+      border: none;
+      border-radius: 4px;
+      background: #ddd;
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+
+      cursor: pointer;
+
+      border: 2px solid #fff;
+      border-radius: 50%;
+      background: #333;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    #r-slider {
+      background: var(--gradient);
+
+      --gradient: linear-gradient(to right, #000, #f00);
+    }
+
+    #r-slider::-moz-range-track {
+      background: var(--gradient);
+    }
+
+    #r-slider::-webkit-slider-thumb {
+      background: rgb(var(--now-r), 0, 0);
+    }
+
+    #r-slider::-moz-range-thumb {
+      background: rgb(var(--now-r), 0, 0);
+    }
+
+    #g-slider {
+      background: var(--gradient);
+
+      --gradient: linear-gradient(to right, #000, #0f0);
+    }
+
+    #g-slider::-moz-range-track {
+      background: var(--gradient);
+    }
+
+    #g-slider::-webkit-slider-thumb {
+      background: rgb(0, var(--now-g), 0);
+    }
+
+    #g-slider::-moz-range-thumb {
+      background: rgb(0, var(--now-g), 0);
+    }
+
+    #b-slider {
+      background: var(--gradient);
+
+      --gradient: linear-gradient(to right, #000, #00f);
+    }
+
+    #b-slider::-moz-range-track {
+      background: var(--gradient);
+    }
+
+    #b-slider::-webkit-slider-thumb {
+      background: rgb(0, 0, var(--now-b));
+    }
+
+    #b-slider::-moz-range-thumb {
+      background: rgb(0, 0, var(--now-b));
+    }
+
+    #a-slider {
+      background: var(--gradient);
+
+      --gradient: linear-gradient(to right, transparent, #000);
+    }
+
+    #a-slider::-moz-range-track {
+      background: var(--gradient);
+    }
+
+    #a-slider::-webkit-slider-thumb {
+      background: rgb(var(--now-a), var(--now-a), var(--now-a));
+    }
+
+    #a-slider::-moz-range-thumb {
+      background: rgb(var(--now-a), var(--now-a), var(--now-a));
     }
   </style>
 </head>
 
-<body>
+<body data-theme="light">
   <div id="body">
-    <div id="container">
+    <div id="container" ondblclick="">
       <pre id="color">#------</pre>
+      <div class="color-slider-container" style="margin-top: 0.5em;">
+        <label class="color-slider">R: <input type="range" id="r-slider" min="0" max="255" oninput="ucfs()"></label>
+        <label class="color-slider">G: <input type="range" id="g-slider" min="0" max="255" oninput="ucfs()"></label>
+        <label class="color-slider">B: <input type="range" id="b-slider" min="0" max="255" oninput="ucfs()"></label>
+        <label class="color-slider">A: <input type="range" id="a-slider" min="0" max="255" oninput="ucfs()"></label>
+        <script>
+          function ucfs() {
+            const r = parseInt(document.getElementById('r-slider').value).toString(16).padStart(2, '0');
+            const g = parseInt(document.getElementById('g-slider').value).toString(16).padStart(2, '0');
+            const b = parseInt(document.getElementById('b-slider').value).toString(16).padStart(2, '0');
+            const a = parseInt(document.getElementById('a-slider').value).toString(16).padStart(2, '0');
+            changeColor('#' + r + g + b + a);
+          }
+        </script>
+      </div>
     </div>
   </div>
-
 
   <script>
     function setText(text, dark = false) {
       const colorElement = document.getElementById('color');
+      colorElement.innerHTML =
+        text[0] +
+        '<span onmousewheel="mousewheel(event)">' + text.substr(1, 2) + '</span>' +
+        '<span onmousewheel="mousewheel(event)">' + text.substr(3, 2) + '</span>' +
+        '<span onmousewheel="mousewheel(event)">' + text.substr(5, 2) + '</span>' +
+        '<span onmousewheel="mousewheel(event)">' + text.substr(7, 2) + '</span>';
+      document.body.dataset.theme = dark ? 'dark' : 'light';
       if (dark) {
-        colorElement.innerHTML =
-          text[0] +
-          '<span style="color: #f55;">' + text.substr(1, 2) + '</span>' +
-          '<span style="color: #0a0;">' + text.substr(3, 2) + '</span>' +
-          '<span style="color: #88f;">' + text.substr(5, 2) + '</span>' +
-          '<span style="color: #aaa;">' + text.substr(7, 2) + '</span>';
         colorElement.style.color = '#aaa';
       } else {
-        colorElement.innerHTML =
-          text[0] +
-          '<span style="color: #c00;">' + text.substr(1, 2) + '</span>' +
-          '<span style="color: #070;">' + text.substr(3, 2) + '</span>' +
-          '<span style="color: #33f;">' + text.substr(5, 2) + '</span>' +
-          '<span style="color: #555;">' + text.substr(7, 2) + '</span>';
-        colorElement.style.color = '#555';
       }
       colorElement.style.opacity = 1;
+    }
+  </script>
+
+  <script>
+    function mousewheel(event) {
+      event.preventDefault();
+      const delta = event.deltaY || event.detail || event.wheelDelta;
+      event.target.innerText = Math.min(Math.max(parseInt(event.target.innerText, 16) + (delta > 0 ? -8 : 8), 0), 255).toString(16).padStart(2, '0');
+      const color = document.getElementById('color').innerText;
+      changeColor(color);
     }
   </script>
 
@@ -141,7 +357,35 @@
       return lab.l;
     }
 
-    function setBackgroundColor() {
+    let currentColor = null;
+    function setBackgroundColor(color) {
+      if (color !== null) {
+        const darkstyle = calculateLabLightness(color) >= 60;
+        document.getElementById('body').style.backgroundColor = color;
+        document.getElementById('container').style.backgroundColor = darkstyle ? '#333c' : '#eeec';
+        setText(color, darkstyle);
+      } else {
+        document.getElementById('body').style.backgroundColor = 'transparent';
+        document.getElementById('container').style.backgroundColor = '#eeec';
+        setText('#--------');
+        color = '#00000000';
+      }
+      currentColor = color;
+      document.getElementById('r-slider').value = parseInt(color.substr(1, 2), 16);
+      document.getElementById('g-slider').value = parseInt(color.substr(3, 2), 16);
+      document.getElementById('b-slider').value = parseInt(color.substr(5, 2), 16);
+      document.getElementById('a-slider').value = parseInt(color.substr(7, 2), 16);
+      document.getElementById('r-slider').style.setProperty('--gradient', `linear-gradient(to right, #00${color.substr(3, 4)}, #ff${color.substr(3, 4)})`);
+      document.getElementById('g-slider').style.setProperty('--gradient', `linear-gradient(to right, #${color.substr(1, 2)}00${color.substr(5, 2)}, #${color.substr(1, 2)}ff${color.substr(5, 2)})`);
+      document.getElementById('b-slider').style.setProperty('--gradient', `linear-gradient(to right, #${color.substr(1, 4)}00, #${color.substr(1, 4)}ff)`);
+      document.getElementById('a-slider').style.setProperty('--gradient', `linear-gradient(to right, #${color.substr(1, 6)}00, #${color.substr(1, 6)}ff)`);
+      document.body.style.setProperty('--now-r', parseInt(color.substr(1, 2), 16));
+      document.body.style.setProperty('--now-g', parseInt(color.substr(3, 2), 16));
+      document.body.style.setProperty('--now-b', parseInt(color.substr(5, 2), 16));
+      document.body.style.setProperty('--now-a', parseInt(color.substr(7, 2), 16));
+    }
+
+    function loadColor() {
       let colorHash = window.location.hash.substring(1);
       let color = null;
       if (/^[0-9A-Fa-f]+$/.test(colorHash)) {
@@ -155,21 +399,16 @@
           color = '#' + colorHash;
         }
       }
-
-      if (color !== null) {
-        const darkstyle = calculateLabLightness(color) >= 60;
-        document.getElementById('body').style.backgroundColor = color;
-        document.getElementById('container').style.backgroundColor = darkstyle ? '#333c' : '#eeec';
-        setText(color, darkstyle);
-      } else {
-        document.getElementById('body').style.backgroundColor = 'transparent';
-        document.getElementById('container').style.backgroundColor = '#eeec';
-        setText('#--------');
-      }
+      setBackgroundColor(color);
     }
 
-    window.addEventListener('load', setBackgroundColor);
-    window.addEventListener('hashchange', setBackgroundColor);
+    function changeColor(color) {
+      window.location.hash = color;
+      setBackgroundColor(color);
+    }
+
+    window.addEventListener('load', loadColor);
+    window.addEventListener('hashchange', loadColor);
   </script>
 </body>
 
