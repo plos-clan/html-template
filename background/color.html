@@ -10,6 +10,23 @@
       margin: 0;
       padding: 0;
       font-family: Arial, sans-serif;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background-color: #aaa;
+      background-image:
+        linear-gradient(45deg, #ccc 25%, transparent 25%),
+        linear-gradient(-45deg, #ccc 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #ccc 75%),
+        linear-gradient(-45deg, transparent 75%, #ccc 75%);
+      background-size: 20px 20px;
+      background-position: 0 0, 0 10px, 10px -10px, -10px 0;
+      user-select: none;
+    }
+
+    #body {
+      margin: 0;
+      padding: 0;
       transition: background-color 0.3s ease;
       width: 100vw;
       height: 100vh;
@@ -19,39 +36,139 @@
       overflow: hidden;
     }
 
-    .container {
+    #container {
       text-align: center;
-      background: rgba(255, 255, 255, 0.9);
       padding: 15px 30px;
       border-radius: 10px;
       box-shadow: 4px 4px 8px 4px rgba(0, 0, 0, 0.1);
-      opacity: 0.9;
+      transition: background-color 0.3s ease;
+      backdrop-filter: blur(2px);
     }
 
-    pre {
+    #color {
       font-size: xx-large;
+      color: #333333;
+      font-weight: bold;
+      margin: 0;
+      padding: 0;
+      opacity: 0;
+      transition: opacity 0.3s ease;
     }
   </style>
 </head>
 
 <body>
-  <div class="container">
-    <pre id="color">#ffffff</pre>
+  <div id="body">
+    <div id="container">
+      <pre id="color">#------</pre>
+    </div>
   </div>
 
+
   <script>
+    function setText(text, dark = false) {
+      const colorElement = document.getElementById('color');
+      if (dark) {
+        colorElement.innerHTML =
+          text[0] +
+          '<span style="color: #f55;">' + text.substr(1, 2) + '</span>' +
+          '<span style="color: #0a0;">' + text.substr(3, 2) + '</span>' +
+          '<span style="color: #88f;">' + text.substr(5, 2) + '</span>' +
+          '<span style="color: #aaa;">' + text.substr(7, 2) + '</span>';
+        colorElement.style.color = '#aaa';
+      } else {
+        colorElement.innerHTML =
+          text[0] +
+          '<span style="color: #c00;">' + text.substr(1, 2) + '</span>' +
+          '<span style="color: #070;">' + text.substr(3, 2) + '</span>' +
+          '<span style="color: #33f;">' + text.substr(5, 2) + '</span>' +
+          '<span style="color: #555;">' + text.substr(7, 2) + '</span>';
+        colorElement.style.color = '#555';
+      }
+      colorElement.style.opacity = 1;
+    }
+  </script>
+
+  <script>
+    function rgbToXyz(r, g, b) {
+      r /= 255;
+      g /= 255;
+      b /= 255;
+
+      r = r > 0.04045 ? Math.pow((r + 0.055) / 1.055, 2.4) : r / 12.92;
+      g = g > 0.04045 ? Math.pow((g + 0.055) / 1.055, 2.4) : g / 12.92;
+      b = b > 0.04045 ? Math.pow((b + 0.055) / 1.055, 2.4) : b / 12.92;
+
+      const x = r * 0.4124564 + g * 0.3575761 + b * 0.1804375;
+      const y = r * 0.2126729 + g * 0.7151522 + b * 0.0721750;
+      const z = r * 0.0193339 + g * 0.1191920 + b * 0.9503041;
+
+      return { x, y, z };
+    }
+
+    function xyzToLab(x, y, z) {
+      x /= 0.95047;
+      y /= 1.00000;
+      z /= 1.08883;
+
+      const fx = x > 0.008856 ? Math.pow(x, 1 / 3) : (7.787 * x + 16 / 116);
+      const fy = y > 0.008856 ? Math.pow(y, 1 / 3) : (7.787 * y + 16 / 116);
+      const fz = z > 0.008856 ? Math.pow(z, 1 / 3) : (7.787 * z + 16 / 116);
+
+      const l = 116 * fy - 16;
+      const a = 500 * (fx - fy);
+      const b = 200 * (fy - fz);
+
+      return { l, a, b };
+    }
+
+    function hexToRgb(hex) {
+      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})[a-f\d]{2}?$/i.exec(hex);
+      return result ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16)
+      } : null;
+    }
+
+    function calculateLabLightness(hexColor) {
+      const rgb = hexToRgb(hexColor);
+      if (!rgb) return 0;
+
+      const xyz = rgbToXyz(rgb.r, rgb.g, rgb.b);
+      const lab = xyzToLab(xyz.x, xyz.y, xyz.z);
+
+      return lab.l;
+    }
+
     function setBackgroundColor() {
       let colorHash = window.location.hash.substring(1);
-      const colorRegex = /^[0-9A-Fa-f]{6}$/;
-      if (colorRegex.test(colorHash)) {
-        const color = '#' + colorHash;
-        document.body.style.backgroundColor = color;
-        document.getElementById('color').textContent = color;
+      let color = null;
+      if (/^[0-9A-Fa-f]+$/.test(colorHash)) {
+        if (colorHash.length === 3) {
+          color = '#' + colorHash.split('').map(c => c + c).join('') + 'ff';
+        } else if (colorHash.length === 4) {
+          color = '#' + colorHash.split('').map(c => c + c).join('');
+        } else if (colorHash.length === 6) {
+          color = '#' + colorHash + 'ff';
+        } else if (colorHash.length === 8) {
+          color = '#' + colorHash;
+        }
+      }
+
+      if (color !== null) {
+        const darkstyle = calculateLabLightness(color) >= 60;
+        document.getElementById('body').style.backgroundColor = color;
+        document.getElementById('container').style.backgroundColor = darkstyle ? '#333c' : '#eeec';
+        setText(color, darkstyle);
       } else {
-        document.body.style.backgroundColor = '#ffffff';
+        document.getElementById('body').style.backgroundColor = 'transparent';
+        document.getElementById('container').style.backgroundColor = '#eeec';
+        setText('#--------');
       }
     }
-    setBackgroundColor();
+
+    window.addEventListener('load', setBackgroundColor);
     window.addEventListener('hashchange', setBackgroundColor);
   </script>
 </body>
